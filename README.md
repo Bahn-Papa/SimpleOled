@@ -9,7 +9,7 @@ Then deliver the buffer as parameter to the Print functions.<br>
 ### Why another OLED library ?
 
 I was searching for a simple OLED library to print out some infos (e.g.: debug infos).
-But all I found were libraries with much more capabilities that I want to have.
+But all I found were libraries with much more capabilities that I don't want to have.
 Therefore these libraries need many resources (e.g.: flash and RAM memory).
 So I decide to write my own simple library.
 

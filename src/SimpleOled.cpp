@@ -1,11 +1,11 @@
 //##########################################################################
 //#
-//#		simple_oled_sh1106.cpp
+//#		SimpleOled.cpp
 //#
 //#-------------------------------------------------------------------------
 //#
-//#	This class is used to control an OLED display with the sh1106 chipset
-//#	via the I²C bus.
+//#	This class is used to control an OLED display with an sh1106 or ssd1306
+//#	chipset via the I²C bus.
 //#	Supported are only simple text output and some auxiliary functions,
 //#	e.g.: clear display, clear line, position cursor, etc.
 //#
@@ -17,6 +17,14 @@
 //#							Am Kuckhof 8
 //#							D - 52146 Würselen
 //#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	2		Date: 20.09.2023
+//#
+//#	Implementation:
+//#		-	add op codes for the different chips
+//#		-	prepare to distinguage between sh1106 and ssd1306
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -37,7 +45,7 @@
 #include <avr/pgmspace.h>
 #include <Wire.h>
 
-#include "simple_oled_sh1106.h"
+#include "SimpleOled.h"
 #include "font.h"
 
 
@@ -47,18 +55,11 @@
 //
 //==========================================================================
 
-#define DISPLAY_LINES					64
-#define DISPLAY_COLUMNS					132
-
 #define	TEXT_LINES						8
 #define TEXT_COLUMNS					16
 
 #define PIXELS_CHAR_HEIGHT				8
 #define PIXELS_CHAR_WIDTH				8
-
-#define DISPLAY_LINE_OFFSET_MAX			63
-#define DISPLAY_LINE_OFFSET_MIN			0
-#define DISPLAY_LINE_OFFSET_DEFAULT		0
 
 #define DISPLAY_COLUMN_OFFSET_MAX		3
 #define DISPLAY_COLUMN_OFFSET_MIN		0
@@ -74,26 +75,42 @@
 //	Definitions for I²C protocol
 //
 
-//----	Prefix Codes  --------------------------------------------------
-#define	PREFIX_NEXT_COMMAND				0x80
-#define PREFIX_LAST_COMMAND				0x00
-#define PREFIX_DATA						0x40
-
-//----	Command Codes  -------------------------------------------------
+//----	common command codes  ------------------------------------------
 #define	OPC_COLUMN_ADDRESS_LOW			0x00
 #define OPC_COLUMN_ADDRESS_HIGH			0x10
+#define OPC_DISPLAY_START_LINE			0x40
+#define OPC_SET_CONTRAST				0x81
 #define OPC_SEG_ROTATION_RIGHT			0xA0
 #define OPC_SEG_ROTATION_LEFT			0xA1
 #define	OPC_ENTIRE_DISPLAY_NORMAL		0xA4
 #define	OPC_ENTIRE_DISPLAY_ON			0xA5
 #define OPC_MODE_NORMAL					0xA6
 #define OPC_MODE_INVERSE				0xA7
+#define OPC_SET_MULTIPLEX_RATIO			0xA8
 #define OPC_DISPLAY_OFF					0xAE
 #define OPC_DISPLAY_ON					0xAF
 #define	OPC_PAGE_ADDRESS				0xB0
 #define OPC_OUTPUT_SCAN_NORMAL			0xC0
 #define OPC_OUTPUT_SCAN_INVERSE			0xC8
 #define OPC_DISPLAY_LINE_OFFSET			0xD3
+#define OPC_CLK_DIV_OSC_FREQ			0xD5
+#define OPC_DIS_PRE_CHARGE_PERIOD		0xD9
+#define OPC_NOP							0xE3
+
+//----	sh1106 specific command codes  ---------------------------------
+#define OPC_DC_DC_PUMP_VOLTAGE_6_4		0x30
+#define OPC_DC_DC_PUMP_VOLTAGE_7_4		0x31
+#define OPC_DC_DC_PUMP_VOLTAGE_8_0		0x32
+#define OPC_DC_DC_PUMP_VOLTAGE_9_0		0x33
+#define OPC_DC_DC_CONTROL_MODE			0xAD
+
+//----	ssd1306 specific command codes  --------------------------------
+#define OPC_MEMORY_ADR_MODE				0x20
+
+//----	prefix codes  --------------------------------------------------
+#define	PREFIX_NEXT_COMMAND				0x80
+#define PREFIX_LAST_COMMAND				0x00
+#define PREFIX_DATA						0x40
 
 //----	Masks to prepare commands  -------------------------------------
 #define MASK_PAGE_ADDRESS				0x0F
@@ -104,6 +121,85 @@
 #define	IDX_PAGE_ADDRESS				1
 #define IDX_COLUMN_ADDRESS_LOW			3
 #define IDX_COLUMN_ADDRESS_HIGH			5
+
+//----	memory addressing modes  ---------------------------------------
+#define ADR_MODE_HORIZONTAL				0x00
+#define ADR_MODE_VERTICAL				0x01
+#define ADR_MODE_PAGE					0x02
+
+//----	DC DC control modes  -------------------------------------------
+#define DC_DC_OFF						0x8A
+#define DC_DC_ON						0x8B
+
+//----	Clock divide ratio values  -------------------------------------
+#define CLOCK_DIV_RATIO_1				0x00
+#define CLOCK_DIV_RATIO_2				0x01
+#define CLOCK_DIV_RATIO_3				0x02
+#define CLOCK_DIV_RATIO_4				0x03
+#define CLOCK_DIV_RATIO_5				0x04
+#define CLOCK_DIV_RATIO_6				0x05
+#define CLOCK_DIV_RATIO_7				0x06
+#define CLOCK_DIV_RATIO_8				0x07
+#define CLOCK_DIV_RATIO_9				0x08
+#define CLOCK_DIV_RATIO_10				0x09
+#define CLOCK_DIV_RATIO_11				0x0A
+#define CLOCK_DIV_RATIO_12				0x0B
+#define CLOCK_DIV_RATIO_13				0x0C
+#define CLOCK_DIV_RATIO_14				0x0D
+#define CLOCK_DIV_RATIO_15				0x0E
+#define CLOCK_DIV_RATIO_16				0x0F
+
+//----	Oscilator frequence variation  ---------------------------------
+#define OSC_FREQ_VARIATION_M_25			0x00
+#define OSC_FREQ_VARIATION_M_20			0x10
+#define OSC_FREQ_VARIATION_M_15			0x20
+#define OSC_FREQ_VARIATION_M_10			0x30
+#define OSC_FREQ_VARIATION_M_5			0x40
+#define OSC_FREQ_VARIATION_P_M_2		0x50
+#define OSC_FREQ_VARIATION_P_5			0x60
+#define OSC_FREQ_VARIATION_P_10			0x70
+#define OSC_FREQ_VARIATION_P_15			0x80
+#define OSC_FREQ_VARIATION_P_20			0x90
+#define OSC_FREQ_VARIATION_P_25			0xA0
+#define OSC_FREQ_VARIATION_P_30			0xB0
+#define OSC_FREQ_VARIATION_P_35			0xC0
+#define OSC_FREQ_VARIATION_P_40			0xD0
+#define OSC_FREQ_VARIATION_P_45			0xE0
+#define OSC_FREQ_VARIATION_P_50			0xF0
+
+//----	Pre Charge periods  --------------------------------------------
+#define PRE_CHARGE_PERIOD_DCLK_1		0x01
+#define PRE_CHARGE_PERIOD_DCLK_2		0x02
+#define PRE_CHARGE_PERIOD_DCLK_3		0x03
+#define PRE_CHARGE_PERIOD_DCLK_4		0x04
+#define PRE_CHARGE_PERIOD_DCLK_5		0x05
+#define PRE_CHARGE_PERIOD_DCLK_6		0x06
+#define PRE_CHARGE_PERIOD_DCLK_7		0x07
+#define PRE_CHARGE_PERIOD_DCLK_8		0x08
+#define PRE_CHARGE_PERIOD_DCLK_9		0x09
+#define PRE_CHARGE_PERIOD_DCLK_10		0x0A
+#define PRE_CHARGE_PERIOD_DCLK_11		0x0B
+#define PRE_CHARGE_PERIOD_DCLK_12		0x0C
+#define PRE_CHARGE_PERIOD_DCLK_13		0x0D
+#define PRE_CHARGE_PERIOD_DCLK_14		0x0E
+#define PRE_CHARGE_PERIOD_DCLK_15		0x0F
+
+//----	Dis Charge periods  --------------------------------------------
+#define DIS_CHARGE_PERIOD_DCLK_1		0x10
+#define DIS_CHARGE_PERIOD_DCLK_2		0x20
+#define DIS_CHARGE_PERIOD_DCLK_3		0x30
+#define DIS_CHARGE_PERIOD_DCLK_4		0x40
+#define DIS_CHARGE_PERIOD_DCLK_5		0x50
+#define DIS_CHARGE_PERIOD_DCLK_6		0x60
+#define DIS_CHARGE_PERIOD_DCLK_7		0x70
+#define DIS_CHARGE_PERIOD_DCLK_8		0x80
+#define DIS_CHARGE_PERIOD_DCLK_9		0x90
+#define DIS_CHARGE_PERIOD_DCLK_10		0xA0
+#define DIS_CHARGE_PERIOD_DCLK_11		0xB0
+#define DIS_CHARGE_PERIOD_DCLK_12		0xC0
+#define DIS_CHARGE_PERIOD_DCLK_13		0xD0
+#define DIS_CHARGE_PERIOD_DCLK_14		0xE0
+#define DIS_CHARGE_PERIOD_DCLK_15		0xF0
 
 
 //==========================================================================
@@ -149,7 +245,7 @@ SimpleDisplayClass::SimpleDisplayClass()
 //	operation mode, switches the display 'on', clears the display and
 //	sets the cursor to home position (top left corner).
 //
-uint8_t SimpleDisplayClass::Init( uint8_t address )
+uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
 {
 	uint8_t usCheck;
 	uint8_t	usError;
@@ -158,9 +254,10 @@ uint8_t SimpleDisplayClass::Init( uint8_t address )
 	//------------------------------------------------------------------
 	//	set initial values for internal variables
 	//
+	m_ChipType		= chipType;
+	m_PrintMode		= PM_SCROLL_LINE;
 	m_usTextLine	= 0;
 	m_usTextColumn	= 0;
-	m_usPrintMode	= PM_SCROLL_LINE;
 	m_usLineOffset	= 0;
 	m_bInverse		= false;
 
@@ -595,53 +692,6 @@ void SimpleDisplayClass::Flip( bool bFlip )
 	}
 	
 	Clear();
-}
-
-
-//**************************************************************************
-//	SetPrintModeOverwriteSameLine
-//--------------------------------------------------------------------------
-//	This function sets the PrintMode to overwrite same line.
-//	Overwrite same line means:
-//	if the text output comes to the end of a line then continue with the
-//	output in the same line and overwrite an existing text.
-//
-void SimpleDisplayClass::SetPrintModeOverwriteSameLine( void )
-{
-	m_usPrintMode = PM_OVERWRITE_SAME_LINE;
-}
-
-
-//**************************************************************************
-//	SetPrintModeOverwriteNextLine
-//--------------------------------------------------------------------------
-//	This function sets the PrintMode to overwrite next line.
-//	Overwrite next line means:
-//	if the text output comes to the end of a line then continue with the
-//	output in the next line and perhaps overwrite an existing text.
-//	if it was the last line of the display then jumpt to the first line and
-//	continue the output there.
-//
-void SimpleDisplayClass::SetPrintModeOverwriteNextLine( void )
-{
-	m_usPrintMode = PM_OVERWRITE_NEXT_LINE;
-}
-
-
-//**************************************************************************
-//	SetPrintModeScrollLine
-//--------------------------------------------------------------------------
-//	This function sets the PrintMode to scroll line.
-//	Scroll line means:
-//	if the text output comes to the end of a line then continue with the
-//	output in the next line.
-//	If it was the last line of the display then scroll all lines one up
-//	discarding the first line, clear the last line and continue the output
-//	in the cleared last line.
-//
-void SimpleDisplayClass::SetPrintModeScrollLine( void )
-{
-	m_usPrintMode = PM_SCROLL_LINE;
 }
 
 

@@ -3,7 +3,7 @@
 
 //##########################################################################
 //#
-//#		simple_oled_sh1106.h
+//#		SimpleOled.h
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -20,6 +20,13 @@
 //#							Am Kuckhof 8
 //#							D - 52146 Würselen
 //#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	2		Date: 20.09.2023
+//#
+//#	Implementation:
+//#		-	prepare to distinguage between sh1106 and ssd1306
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -52,6 +59,50 @@
 
 //==========================================================================
 //
+//		T Y P E   D E F I N I T I O N S
+//
+//==========================================================================
+
+typedef enum chip_type
+{
+	CHIP_TYPE_SH1106	= 0,
+	CHIP_TYPE_SSD1306
+
+} chip_type_t;
+
+
+//----------------------------------------------------------------------
+//	The different print modes
+//
+//	PM_OVERWRITE_SAME_LINE:
+//		if the text output comes to the end of a line then continue
+//		with the output in the same line and overwrite an existing text.
+//
+//	PM_OVERWRITE_NEXT_LINE:
+//		if the text output comes to the end of a line then continue
+//		with the output in the next line and perhaps overwrite an
+//		existing text.
+//		if it was the last line of the display then jumpt to the first
+//		line and continue the output there.
+//
+//	PM_SCROLL_LINE:
+//		if the text output comes to the end of a line then continue
+//		with the output in the next line.
+//		If it was the last line of the display then scroll all lines
+//		up one line, discarding the first line, clear the last line
+//		and continue the output in the cleared last line.
+//
+typedef enum print_mode
+{
+	PM_OVERWRITE_SAME_LINE	= 1,
+	PM_OVERWRITE_NEXT_LINE,
+	PM_SCROLL_LINE
+
+} print_mode_t;
+
+
+//==========================================================================
+//
 //		C L A S S   D E F I N I T I O N S
 //
 //==========================================================================
@@ -65,7 +116,7 @@ class SimpleDisplayClass
 	public:
 		SimpleDisplayClass();
 
-		uint8_t Init( uint8_t address = DISPLAY_ADDRESS );
+		uint8_t Init( chip_type_t chipType = CHIP_TYPE_SH1106, uint8_t address = DISPLAY_ADDRESS );
 
 		uint8_t MaxTextLines( void );
 		uint8_t MaxTextColumns( void );
@@ -111,20 +162,22 @@ class SimpleDisplayClass
 			m_bInverse = bInverse;
 		};
 
-		void SetPrintModeOverwriteSameLine( void );
-		void SetPrintModeOverwriteNextLine( void );
-		void SetPrintModeScrollLine( void );
+		inline void SetPrintMode( print_mode_t printMode )
+		{
+			m_PrintMode = printMode;
+		};
 
 		void SetDisplayColumnOffset( uint8_t usOffset );
 
 
 	private:
-		uint8_t		m_usAddress;
-		uint8_t		m_usTextLine;
-		uint8_t		m_usTextColumn;
-		uint8_t		m_usPrintMode;
-		uint8_t		m_usLineOffset;
-		bool		m_bInverse;
+		chip_type_t		m_ChipType;
+		print_mode_t	m_PrintMode;
+		uint8_t			m_usAddress;
+		uint8_t			m_usTextLine;
+		uint8_t			m_usTextColumn;
+		uint8_t			m_usLineOffset;
+		bool			m_bInverse;
 
 		void NextLine( bool bShiftLine );
 		void SendCommand( uint8_t usOpCode );
