@@ -23,6 +23,13 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	3		Date: 21.09.2023
+//#
+//#	Implementation:
+//#		-	add support for two chips (sh1106 and ssd1306) finished
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	2		Date: 20.09.2023
 //#
 //#	Implementation:
@@ -174,6 +181,7 @@ class SimpleDisplayClass
 		chip_type_t		m_ChipType;
 		print_mode_t	m_PrintMode;
 		uint8_t			m_usAddress;
+		uint8_t			m_usDisplayColumnOffset;
 		uint8_t			m_usTextLine;
 		uint8_t			m_usTextColumn;
 		uint8_t			m_usLineOffset;

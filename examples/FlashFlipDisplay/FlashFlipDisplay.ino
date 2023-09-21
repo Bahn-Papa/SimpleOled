@@ -2,6 +2,17 @@
 //#
 //#		FlashFlipDisplay.ino
 //#
+//#-------------------------------------------------------------------------
+//#
+//#		MIT License
+//#
+//#		Copyright (c) 2023	Michael Pfeil
+//#							Am Kuckhof 8
+//#							D - 52146 Würselen
+//#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	This example shows how to flash (invert) the display
 //#	(e.g. to display an alarm)
 //# and it shows how to "flip" the display (turn text by 180 degree).
@@ -23,7 +34,7 @@
 
 #include <stdint.h>
 #include <avr/pgmspace.h>
-#include <simple_oled_sh1106.h>
+#include <SimpleOled.h>
 
 
 //==========================================================================
@@ -42,7 +53,7 @@ char g_buffer[ 20 ];
 //
 void setup()
 {
-	g_clDisplay.Init();
+	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
 }
 
 

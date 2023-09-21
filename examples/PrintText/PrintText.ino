@@ -2,15 +2,26 @@
 //#
 //#		PrintText.ino
 //#
+//#-------------------------------------------------------------------------
+//#
+//#		MIT License
+//#
+//#		Copyright (c) 2023	Michael Pfeil
+//#							Am Kuckhof 8
+//#							D - 52146 Würselen
+//#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	This program will write Text on an OLED display and demonstrates
-//#	some options of the simple_oled_sh1106 library, like
+//#	some options of the SimpleOled library, like
 //#		- Cursor positioning
 //#		- normal and inverse text font
 //#
 //#-------------------------------------------------------------------------
 //#
 //#	Dieses Programm schreibt Text auf ein OLED Display und zeigt dabei
-//#	einige Möglichkeiten aus der simple_OLED_sh1106 Library:
+//#	einige Möglichkeiten aus der SimpleOled Library:
 //#		- Cursor positionieren
 //#		- normale und inverse Textausgabe
 //#
@@ -24,7 +35,7 @@
 //==========================================================================
 
 #include <stdint.h>
-#include <simple_oled_sh1106.h>
+#include <SimpleOled.h>
 
 
 //==========================================================================
@@ -43,7 +54,7 @@ char g_buffer[ 20 ];
 //
 void setup()
 {
-	g_clDisplay.Init();
+	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
 }
 
 
@@ -123,7 +134,7 @@ void loop()
 	delay( 500 );
 
 	//----------------------------------------------------------------------
-	//	In this example you can see how to print text with numbers in.
+	//	In this example you can see how to print text with numbers in it.
 	//	First prepare the text (in this case with function sprintf).
 	//	Then print the text.
 	for( uint8_t idx = 0 ; idx < g_clDisplay.MaxTextLines() ; idx++ )

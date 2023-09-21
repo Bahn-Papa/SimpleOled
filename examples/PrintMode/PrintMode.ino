@@ -2,11 +2,22 @@
 //#
 //#		PrintMode.ino
 //#
+//#-------------------------------------------------------------------------
+//#
+//#		MIT License
+//#
+//#		Copyright (c) 2023	Michael Pfeil
+//#							Am Kuckhof 8
+//#							D - 52146 Würselen
+//#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	This program will write Text on an OLED display and demonstrates
 //#	the different PrintModes:
-//#		- Overwrite Next Line (default mode)
+//#		- Overwrite Next Line
 //#		- Overwrite Same Line
-//#		- Scroll Line
+//#		- Scroll Line (default mode)
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -28,8 +39,8 @@
 //#		is still some text to print then the cursor is set to the beginning
 //#		of the actual line. The output of the text will continue starting
 //#		from this position. The old text in this line will be overwriten.
-//#		As long as the Print function without '\n' in the text is used the
-//#		output of text will go into the same line.
+//#		As long as the Print function without a '\n' in the text is used
+//#		the output of text will go into the same line.
 //#		To change the line use function SetCursor, function PrintLn or
 //#		use the character '\n' within the text.
 //#		If the function PrintLn or the character '\n' is used in the last
@@ -59,7 +70,7 @@
 //==========================================================================
 
 #include <stdint.h>
-#include <simple_oled_sh1106.h>
+#include <SimpleOled.h>
 
 
 //==========================================================================
@@ -70,9 +81,8 @@
 
 char g_strPrintModes[]			= "PrintModes Demo";
 char g_strOverwriteNextLine[]	= " Overwrite Next Line ";
-char g_strOverwriteSameLine[]	= " Overwrite Same Line ";
+char g_strOverwriteSameLine[]	= " Overwrite Same Line \n\n";
 char g_strScrollLine[]			= " Scroll Line (default mode) ";
-char g_buffer[]					= " ";
 bool g_bInverseFont				= false;
 
 
@@ -83,7 +93,7 @@ bool g_bInverseFont				= false;
 //
 void setup()
 {
-	g_clDisplay.Init();
+	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
 }
 
 
@@ -99,11 +109,13 @@ void loop()
 	//------------------------------------------------------------------
 	//	start with PrintMode 'Scroll Line' (the default mode)
 	//
+	g_clDisplay.Clear();
 	g_clDisplay.Print( g_strPrintModes );
 
 	delay( 2000 );
 
-	g_clDisplay.SetPrintModeScrollLine();
+	g_clDisplay.SetPrintMode( PM_SCROLL_LINE );
+
 	g_clDisplay.SetCursor( 2, 0 );
 	g_clDisplay.PrintLn( g_strScrollLine );
 
@@ -113,65 +125,67 @@ void loop()
 		g_bInverseFont	= !g_bInverseFont;
 
 		g_clDisplay.SetInverseFont( g_bInverseFont );
-		
+
 		while( '\0' != *pchLetter )
 		{
-			g_buffer[ 0 ] = *pchLetter++;
-			
-			g_clDisplay.Print( g_buffer );
-			
+			g_clDisplay.PrintChar( *pchLetter++ );
+
 			delay( 100 );
 		}
 	}
 
 	g_bInverseFont = false;
 	g_clDisplay.SetInverseFont( false );
-	g_clDisplay.Clear();
+
+	delay( 5000 );
 
 
 	//------------------------------------------------------------------
 	//	next PrintMode is 'Overwrite Next Line'
 	//
+	g_clDisplay.Clear();
 	g_clDisplay.Print( g_strPrintModes );
 
 	delay( 2000 );
 
-	g_clDisplay.SetPrintModeOverwriteNextLine();
+	g_clDisplay.SetPrintMode( PM_OVERWRITE_NEXT_LINE );
+
 	g_clDisplay.SetCursor( 2, 0 );
 	g_clDisplay.PrintLn( g_strOverwriteNextLine );
-	
+
 	for( uint8_t count = 0 ; count < 7 ; count++ )
 	{
 		pchLetter		= g_strOverwriteNextLine;
 		g_bInverseFont	= !g_bInverseFont;
 
 		g_clDisplay.SetInverseFont( g_bInverseFont );
-		
+
 		while( '\0' != *pchLetter )
 		{
-			g_buffer[ 0 ] = *pchLetter++;
-			
-			g_clDisplay.Print( g_buffer );
-			
+			g_clDisplay.PrintChar( *pchLetter++ );
+
 			delay( 100 );
 		}
 	}
-	
+
 	g_bInverseFont = false;
 	g_clDisplay.SetInverseFont( false );
-	g_clDisplay.Clear();
+
+	delay( 5000 );
 
 
 	//------------------------------------------------------------------
 	//	the last PrintMode is 'Overwrite Same Line'
 	//
+	g_clDisplay.Clear();
 	g_clDisplay.Print( g_strPrintModes );
 
 	delay( 2000 );
 
 	g_clDisplay.SetCursor( 2, 0 );
 	g_clDisplay.PrintLn( g_strOverwriteSameLine );
-	g_clDisplay.SetPrintModeOverwriteSameLine();
+
+	g_clDisplay.SetPrintMode( PM_OVERWRITE_SAME_LINE );
 
 	for( uint8_t count = 0 ; count < 5 ; count++ )
 	{
@@ -179,18 +193,17 @@ void loop()
 		g_bInverseFont	= !g_bInverseFont;
 
 		g_clDisplay.SetInverseFont( g_bInverseFont );
-		
+
 		while( '\0' != *pchLetter )
 		{
-			g_buffer[ 0 ] = *pchLetter++;
-			
-			g_clDisplay.Print( g_buffer );
-			
+			g_clDisplay.PrintChar( *pchLetter++ );
+
 			delay( 100 );
 		}
 	}
 
 	g_bInverseFont = false;
 	g_clDisplay.SetInverseFont( false );
-	g_clDisplay.Clear();
+
+	delay( 5000 );
 }

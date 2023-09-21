@@ -20,6 +20,8 @@ The class has the following function set:
 
 | Function | Description |
 | --- | --- |
+| Init( \<chip\>, \<address\> ) | Initialize the display which \<chip\> and which I2C \<address\> is used. |
+| | |
 | PrintChar( \<char\> ) | Prints \<char\> at the actual cursor position on the display |
 | | |
 | Print( \<text\> ) | Prints \<text\> starting from the actual cursor position on the display |
@@ -36,13 +38,17 @@ The class has the following function set:
 | | |
 | SetInverse( \<inverse\> ) | inverses the entire display (\<inverse\>=true)<br>each white pixel will get black and each black pixel will get white |
 | Flip( \<on\> ) | turns the output to the display by 180 degree (\<on\>=true) |
+| | |
+| SetPrintMode( \<mode\> ) | There are three print modes:<br>PM_SCROLL_LINE: fill the lines of the display and scroll them out to the top<br>PM_OVERWRITE_NEXT_LINE: continuously overwrite the lines of the display from the beginning to the end<br>PM_OVERWRITE_SAME_LINE: overwrite the actual line |
 
 ## How to use the library
 
 This is a library to use with the Arduino IDE.<br>
 The library itself makes use of the **_Wire_** library delivered with the Arduino IDE.
 
-Have a look into the examples and see how to use the functions.
+Have a look into the examples and see how to use the functions.<br>
+All examples assume to control an OLED display with an sh1106 chip.<br>
+If your display has an ssd1306 chip you have to adapt the 'Init()' function.
 
 | Example | Description |
 | --- | --- |
