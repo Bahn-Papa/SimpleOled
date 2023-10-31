@@ -8,6 +8,7 @@
 //#	chipset via the I²C bus.
 //#	Supported are only simple text output and some auxiliary functions,
 //#	e.g.: clear display, clear line, position cursor, etc.
+//#	If no display is connected nothing will be send over the I2C bus.
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -17,6 +18,19 @@
 //#							Am Kuckhof 8
 //#							D - 52146 Würselen
 //#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	4		Date: 31.10.2023
+//#
+//#	Implementation:
+//#		-	change default chip type to ssd1306
+//#		-	do not send anything over the I2C bus when no display is
+//#			connected
+//#			add variable
+//#				m_bDisplayConnected
+//#			change in functions
+//#				nearly all functions
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -239,6 +253,7 @@ uint8_t	g_arusPositionCommandBuffer[] =
 //
 SimpleDisplayClass::SimpleDisplayClass()
 {
+	m_bDisplayConnected = false;
 }
 
 
@@ -308,7 +323,8 @@ uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
 		//	YES the display can be connected with the given address
 		//	so initialize the display
 		//
-		m_usAddress	= address;
+		m_usAddress			= address;
+		m_bDisplayConnected	= true;
 
 		SendCommand( OPC_DISPLAY_OFF );
 		SendCommand( OPC_ENTIRE_DISPLAY_NORMAL );
@@ -395,7 +411,7 @@ void SimpleDisplayClass::SetCursor( uint8_t usTextLine, uint8_t usTextColumn )
 	uint8_t		usAddressHigh;
 
 
-	if( (TEXT_LINES > usTextLine) && (TEXT_COLUMNS > usTextColumn) )
+	if( m_bDisplayConnected && (TEXT_LINES > usTextLine) && (TEXT_COLUMNS > usTextColumn) )
 	{
 		//------------------------------------------------------------------
 		//	store the new cursor position
@@ -464,57 +480,60 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 	const uint8_t *	pusActualColumn;
 	uint8_t			usLetterColumn;
 
-	if( '\n' == usCharIdx )
+	if( m_bDisplayConnected )
 	{
-		NextLine( true );
-	}
-	else if( (' ' <= usCharIdx) && (128 > usCharIdx) )
-	{
-		//--------------------------------------------------------------
-		//	if we reached the end of the line then depending of the
-		//	PrintMode continue in the 'next line'
-		//
-		if( TEXT_COLUMNS <= m_usTextColumn )
+		if( '\n' == usCharIdx )
 		{
-			NextLine( false );
+			NextLine( true );
 		}
-
-		//--------------------------------------------------------------
-		//	this is a printable character, so calculate the pointer
-		//	into the font array to that position where the bitmap of
-		//	this character starts
-		//
-		uiHelper   = usCharIdx - 32;
-		uiHelper <<= 3;	//	mit 8 multiplizieren
-
-		pusActualColumn = &font8x8_simple[ 0 ] + uiHelper;
-
-		//--------------------------------------------------------------
-		//	transmit the bitmap of the character to the display
-		//
-		Wire.beginTransmission( m_usAddress );
-
-		Wire.write( PREFIX_DATA );
-
-		for( uint8_t idx = 0 ; idx < PIXELS_CHAR_WIDTH ; idx++ )
+		else if( (' ' <= usCharIdx) && (128 > usCharIdx) )
 		{
-			usLetterColumn = pgm_read_byte( pusActualColumn );
-			pusActualColumn++;
-
-			if( m_bInverse )
+			//--------------------------------------------------------------
+			//	if we reached the end of the line then depending of the
+			//	PrintMode continue in the 'next line'
+			//
+			if( TEXT_COLUMNS <= m_usTextColumn )
 			{
-				usLetterColumn = ~usLetterColumn;
+				NextLine( false );
 			}
 
-			Wire.write( usLetterColumn );
+			//--------------------------------------------------------------
+			//	this is a printable character, so calculate the pointer
+			//	into the font array to that position where the bitmap of
+			//	this character starts
+			//
+			uiHelper   = usCharIdx - 32;
+			uiHelper <<= 3;	//	mit 8 multiplizieren
+
+			pusActualColumn = &font8x8_simple[ 0 ] + uiHelper;
+
+			//--------------------------------------------------------------
+			//	transmit the bitmap of the character to the display
+			//
+			Wire.beginTransmission( m_usAddress );
+
+			Wire.write( PREFIX_DATA );
+
+			for( uint8_t idx = 0 ; idx < PIXELS_CHAR_WIDTH ; idx++ )
+			{
+				usLetterColumn = pgm_read_byte( pusActualColumn );
+				pusActualColumn++;
+
+				if( m_bInverse )
+				{
+					usLetterColumn = ~usLetterColumn;
+				}
+
+				Wire.write( usLetterColumn );
+			}
+
+			Wire.endTransmission();
+
+			//--------------------------------------------------------------
+			//	one character printed, so move cursor
+			//
+			m_usTextColumn++;
 		}
-
-		Wire.endTransmission();
-
-		//--------------------------------------------------------------
-		//	one character printed, so move cursor
-		//
-		m_usTextColumn++;
 	}
 }
 
@@ -532,14 +551,17 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 //
 void SimpleDisplayClass::Print( const __FlashStringHelper* cstrText )
 {
-	PGM_P	pText		= reinterpret_cast<PGM_P>( cstrText );
-	uint8_t	usCharIdx	= pgm_read_byte( pText++ );
-
-	while( 0x00 != usCharIdx )
+	if( m_bDisplayConnected )
 	{
-		PrintChar( usCharIdx );
+		PGM_P	pText		= reinterpret_cast<PGM_P>( cstrText );
+		uint8_t	usCharIdx	= pgm_read_byte( pText++ );
 
-		usCharIdx = pgm_read_byte( pText++ );
+		while( 0x00 != usCharIdx )
+		{
+			PrintChar( usCharIdx );
+
+			usCharIdx = pgm_read_byte( pText++ );
+		}
 	}
 }
 
@@ -558,8 +580,11 @@ void SimpleDisplayClass::Print( const __FlashStringHelper* cstrText )
 //
 void SimpleDisplayClass::PrintLn( const __FlashStringHelper* cstrText )
 {
-	Print( cstrText );
-	NextLine( true );
+	if( m_bDisplayConnected )
+	{
+		Print( cstrText );
+		NextLine( true );
+	}
 }
 
 
@@ -576,13 +601,16 @@ void SimpleDisplayClass::PrintLn( const __FlashStringHelper* cstrText )
 //
 void SimpleDisplayClass::Print( char* strText )
 {
-	uint8_t	usCharIdx	= *strText++;
-
-	while( 0x00 != usCharIdx )
+	if( m_bDisplayConnected )
 	{
-		PrintChar( usCharIdx );
+		uint8_t	usCharIdx	= *strText++;
 
-		usCharIdx = *strText++;
+		while( 0x00 != usCharIdx )
+		{
+			PrintChar( usCharIdx );
+
+			usCharIdx = *strText++;
+		}
 	}
 }
 
@@ -601,8 +629,11 @@ void SimpleDisplayClass::Print( char* strText )
 //
 void SimpleDisplayClass::PrintLn( char* strText )
 {
-	Print( strText );
-	NextLine( true );
+	if( m_bDisplayConnected )
+	{
+		Print( strText );
+		NextLine( true );
+	}
 }
 
 
@@ -613,23 +644,26 @@ void SimpleDisplayClass::PrintLn( char* strText )
 //
 void SimpleDisplayClass::Clear( void )
 {
-	for( uint8_t usTextLine = 0 ; usTextLine < TEXT_LINES ; usTextLine++ )
+	if( m_bDisplayConnected )
 	{
-		ClearLine( usTextLine );
+		for( uint8_t usTextLine = 0 ; usTextLine < TEXT_LINES ; usTextLine++ )
+		{
+			ClearLine( usTextLine );
+		}
+
+		//------------------------------------------------------------------
+		//	Set the display line offset back to the default value '0'.
+		//	That means beginn to display the display with the top line.
+		//
+		m_usLineOffset = 0;
+
+		SendCommand( OPC_DISPLAY_LINE_OFFSET, 0 );
+
+		//------------------------------------------------------------------
+		//	set the cursor to home position
+		//
+		SetCursor( 0, 0 );
 	}
-
-	//----------------------------------------------------------------------
-	//	Set the display line offset back to the default value '0'.
-	//	That means beginn to display the display with the top line.
-	//
-	m_usLineOffset = 0;
-
-	SendCommand( OPC_DISPLAY_LINE_OFFSET, 0 );
-
-	//----------------------------------------------------------------------
-	//	set the cursor to home position
-	//
-	SetCursor( 0, 0 );
 }
 
 
@@ -645,84 +679,87 @@ void SimpleDisplayClass::ClearLine( uint8_t usLineToClear )
 	uint8_t		usLoop2End;
 
 
-	//------------------------------------------------------------------
-	//	at the end of the function the cursor will be positioned to
-	//	the beginning of the line that will be cleared
-	//
-	m_usTextLine	= usLineToClear;
-	m_usTextColumn	= 0;
-
-	//------------------------------------------------------------------
-	//	take care of the display line shift
-	//	and correct the line to clear accordingly
-	//
-	usLineToClear += m_usLineOffset;
-
-	if( TEXT_LINES <= usLineToClear )
+	if( m_bDisplayConnected )
 	{
-		usLineToClear -= TEXT_LINES;
-	}
-
-	//------------------------------------------------------------------
-	//	preparation for the command that will be send to the display
-	//		set cursor to actual line first column
-	//
-	usLineToClear &= MASK_PAGE_ADDRESS;
-	g_arusPositionCommandBuffer[ IDX_PAGE_ADDRESS ] = OPC_PAGE_ADDRESS | usLineToClear;
-	g_arusPositionCommandBuffer[ IDX_COLUMN_ADDRESS_LOW  ] = OPC_COLUMN_ADDRESS_LOW;
-	g_arusPositionCommandBuffer[ IDX_COLUMN_ADDRESS_HIGH ] = OPC_COLUMN_ADDRESS_HIGH;
-
-	//------------------------------------------------------------------
-	//	now send the commands to position the cursor to the display
-	//
-	Wire.beginTransmission( m_usAddress );
-	Wire.write( g_arusPositionCommandBuffer, sizeof( g_arusPositionCommandBuffer ) );
-	Wire.endTransmission();
-
-	//------------------------------------------------------------------
-	//	split the number of bytes to be send to clear the display
-	//	to less than 31 ?? (I2C buffer size)
-	//
-	if( CHIP_TYPE_SSD1306 == m_ChipType )
-	{
-		//----------------------------------------------------------
-		//	ssd1306 has 128 pixel columns (8 x 16 = 128)
+		//--------------------------------------------------------------
+		//	at the end of the function the cursor will be positioned to
+		//	the beginning of the line that will be cleared
 		//
-		usLoop1End	= 8;
-		usLoop2End	= 16;
-	}
-	else
-	{
-		//----------------------------------------------------------
-		//	sh1106 has 132 pixel columns (6 x 22 = 132)
+		m_usTextLine	= usLineToClear;
+		m_usTextColumn	= 0;
+
+		//--------------------------------------------------------------
+		//	take care of the display line shift
+		//	and correct the line to clear accordingly
 		//
-		usLoop1End	= 6;
-		usLoop2End	= 22;
-	}
+		usLineToClear += m_usLineOffset;
 
-	for( uint8_t idx1 = 0 ; idx1 < usLoop1End ; idx1++ )
-	{
-		Wire.beginTransmission( m_usAddress );
-
-		Wire.write( PREFIX_DATA );
-
-		for( uint8_t idx2 = 0 ; idx2 < usLoop2End ; idx2++ )
+		if( TEXT_LINES <= usLineToClear )
 		{
-			Wire.write( 0x00 );
+			usLineToClear -= TEXT_LINES;
 		}
 
+		//--------------------------------------------------------------
+		//	preparation for the command that will be send to the
+		//	display: set cursor to actual line first column
+		//
+		usLineToClear &= MASK_PAGE_ADDRESS;
+		g_arusPositionCommandBuffer[ IDX_PAGE_ADDRESS ] = OPC_PAGE_ADDRESS | usLineToClear;
+		g_arusPositionCommandBuffer[ IDX_COLUMN_ADDRESS_LOW  ] = OPC_COLUMN_ADDRESS_LOW;
+		g_arusPositionCommandBuffer[ IDX_COLUMN_ADDRESS_HIGH ] = OPC_COLUMN_ADDRESS_HIGH;
+
+		//--------------------------------------------------------------
+		//	now send the commands to position the cursor to the display
+		//
+		Wire.beginTransmission( m_usAddress );
+		Wire.write( g_arusPositionCommandBuffer, sizeof( g_arusPositionCommandBuffer ) );
+		Wire.endTransmission();
+
+		//--------------------------------------------------------------
+		//	split the number of bytes to be send to clear the display
+		//	to less than 31 ?? (I2C buffer size)
+		//
+		if( CHIP_TYPE_SSD1306 == m_ChipType )
+		{
+			//------------------------------------------------------
+			//	ssd1306 has 128 pixel columns (8 x 16 = 128)
+			//
+			usLoop1End	= 8;
+			usLoop2End	= 16;
+		}
+		else
+		{
+			//------------------------------------------------------
+			//	sh1106 has 132 pixel columns (6 x 22 = 132)
+			//
+			usLoop1End	= 6;
+			usLoop2End	= 22;
+		}
+
+		for( uint8_t idx1 = 0 ; idx1 < usLoop1End ; idx1++ )
+		{
+			Wire.beginTransmission( m_usAddress );
+
+			Wire.write( PREFIX_DATA );
+
+			for( uint8_t idx2 = 0 ; idx2 < usLoop2End ; idx2++ )
+			{
+				Wire.write( 0x00 );
+			}
+
+			Wire.endTransmission();
+		}
+
+		//--------------------------------------------------------------
+		//	set cursor to first text position of this line
+		//
+		g_arusPositionCommandBuffer[ IDX_COLUMN_ADDRESS_LOW  ] =	  OPC_COLUMN_ADDRESS_LOW
+																	| m_usDisplayColumnOffset;
+
+		Wire.beginTransmission( m_usAddress );
+		Wire.write( g_arusPositionCommandBuffer, sizeof( g_arusPositionCommandBuffer ) );
 		Wire.endTransmission();
 	}
-
-	//------------------------------------------------------------------
-	//	set cursor to first text position of this line
-	//
-	g_arusPositionCommandBuffer[ IDX_COLUMN_ADDRESS_LOW  ] =	  OPC_COLUMN_ADDRESS_LOW
-																| m_usDisplayColumnOffset;
-
-	Wire.beginTransmission( m_usAddress );
-	Wire.write( g_arusPositionCommandBuffer, sizeof( g_arusPositionCommandBuffer ) );
-	Wire.endTransmission();
 }
 
 
@@ -734,13 +771,16 @@ void SimpleDisplayClass::ClearLine( uint8_t usLineToClear )
 //
 void SimpleDisplayClass::SetInverse( bool bInverse )
 {
-	if( bInverse )
+	if( m_bDisplayConnected )
 	{
-		SendCommand( OPC_MODE_INVERSE );
-	}
-	else
-	{
-		SendCommand( OPC_MODE_NORMAL );
+		if( bInverse )
+		{
+			SendCommand( OPC_MODE_INVERSE );
+		}
+		else
+		{
+			SendCommand( OPC_MODE_NORMAL );
+		}
 	}
 }
 
@@ -753,18 +793,21 @@ void SimpleDisplayClass::SetInverse( bool bInverse )
 //
 void SimpleDisplayClass::Flip( bool bFlip )
 {
-	if( bFlip )
+	if( m_bDisplayConnected )
 	{
-		SendCommand( OPC_SEG_ROTATION_LEFT );
-		SendCommand( OPC_OUTPUT_SCAN_INVERSE );
+		if( bFlip )
+		{
+			SendCommand( OPC_SEG_ROTATION_LEFT );
+			SendCommand( OPC_OUTPUT_SCAN_INVERSE );
+		}
+		else
+		{
+			SendCommand( OPC_SEG_ROTATION_RIGHT );
+			SendCommand( OPC_OUTPUT_SCAN_NORMAL );
+		}
+		
+		Clear();
 	}
-	else
-	{
-		SendCommand( OPC_SEG_ROTATION_RIGHT );
-		SendCommand( OPC_OUTPUT_SCAN_NORMAL );
-	}
-	
-	Clear();
 }
 
 

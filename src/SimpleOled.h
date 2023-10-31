@@ -11,6 +11,7 @@
 //#	chipset via the I²C bus.
 //#	Supported are only simple text output and some auxiliary functions,
 //#	e.g.: clear display, clear line, position cursor, etc.
+//#	If no display is connected nothing will be send over the I2C bus.
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -20,6 +21,17 @@
 //#							Am Kuckhof 8
 //#							D - 52146 Würselen
 //#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	4		Date: 31.10.2023
+//#
+//#	Implementation:
+//#		-	change default chip type to ssd1306
+//#		-	do not send anything over the I2C bus when no display is
+//#			connected
+//#			add variable
+//#				m_bDisplayConnected
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -123,7 +135,7 @@ class SimpleDisplayClass
 	public:
 		SimpleDisplayClass();
 
-		uint8_t Init( chip_type_t chipType = CHIP_TYPE_SH1106, uint8_t address = DISPLAY_ADDRESS );
+		uint8_t Init( chip_type_t chipType = CHIP_TYPE_SSD1306, uint8_t address = DISPLAY_ADDRESS );
 
 		uint8_t MaxTextLines( void );
 		uint8_t MaxTextColumns( void );
@@ -179,6 +191,7 @@ class SimpleDisplayClass
 
 	private:
 		chip_type_t		m_ChipType;
+		bool			m_bDisplayConnected;
 		print_mode_t	m_PrintMode;
 		uint8_t			m_usAddress;
 		uint8_t			m_usDisplayColumnOffset;
