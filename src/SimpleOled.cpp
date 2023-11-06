@@ -21,6 +21,19 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	5		Date: 06.11.2023
+//#
+//#	Implementation:
+//#		-	add ESP32 support
+//#		-	rework of the initialize sequence
+//#			change in function
+//#				Init()
+//#			new functions
+//#				Initsh1106()
+//#				Initssd1306()
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	4		Date: 31.10.2023
 //#
 //#	Implementation:
@@ -63,8 +76,12 @@
 //
 //==========================================================================
 
-#include <avr/pgmspace.h>
+#include <Arduino.h>
 #include <Wire.h>
+
+#ifdef ARDUINO_ARCH_AVR
+	#include <avr/pgmspace.h>
+#endif
 
 #include "SimpleOled.h"
 #include "font.h"
@@ -75,6 +92,9 @@
 //		D E F I N I T I O N S
 //
 //==========================================================================
+
+//#define	PRINT_DEBUG_INFO
+
 
 #define	TEXT_LINES						8
 #define TEXT_COLUMNS					16
@@ -125,6 +145,8 @@
 
 //----	ssd1306 specific command codes  --------------------------------
 #define OPC_MEMORY_ADR_MODE				0x20
+#define OPC_DEACTIVATE_SCROLL			0x2E
+#define OPC_CHARGE_PUMP_SETTING			0x8D
 
 //----	prefix codes  --------------------------------------------------
 #define	PREFIX_NEXT_COMMAND				0x80
@@ -266,7 +288,6 @@ SimpleDisplayClass::SimpleDisplayClass()
 //
 uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
 {
-	uint8_t usCheck;
 	uint8_t	usError;
 
 
@@ -280,14 +301,6 @@ uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
 	m_usLineOffset	= 0;
 	m_bInverse		= false;
 
-	if( CHIP_TYPE_SSD1306 == m_ChipType )
-	{
-		m_usDisplayColumnOffset	= 0;
-	}
-	else
-	{
-		m_usDisplayColumnOffset	= DISPLAY_COLUMN_OFFSET_DEFAULT;
-	}
 
 	//------------------------------------------------------------------
 	//	Check the given address
@@ -301,15 +314,9 @@ uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
 	}
 
 	//------------------------------------------------------------------
-	//	check if Wire was already initialized
-	//	if not the do it
+	//	Initialize the I2C
 	//
-	usCheck = TWCR;
-
-	if( ~(usCheck | ~(_BV(TWEN) | _BV(TWIE) | _BV(TWEA))) )
-	{
-		Wire.begin();
-	}
+	Wire.begin();
 
 	//------------------------------------------------------------------
 	//	Check if Display can be connected under the given address
@@ -326,42 +333,22 @@ uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
 		m_usAddress			= address;
 		m_bDisplayConnected	= true;
 
-		SendCommand( OPC_DISPLAY_OFF );
-		SendCommand( OPC_ENTIRE_DISPLAY_NORMAL );
-
 		if( CHIP_TYPE_SSD1306 == m_ChipType )
 		{
-			SendCommand( OPC_CLK_DIV_OSC_FREQ, (OSC_FREQ_VARIATION_P_15 | CLOCK_DIV_RATIO_1) );
-			SendCommand( OPC_MEMORY_ADR_MODE, ADR_MODE_PAGE );
+			m_usDisplayColumnOffset	= 0;
+
+			Initssd1306();
 		}
 		else
 		{
-			SendCommand( OPC_CLK_DIV_OSC_FREQ, (OSC_FREQ_VARIATION_P_M_0 | CLOCK_DIV_RATIO_1) );
+			m_usDisplayColumnOffset	= DISPLAY_COLUMN_OFFSET_DEFAULT;
+
+			Initsh1106();
 		}
 
 		SendCommand( OPC_PAGE_ADDRESS );
 		SendCommand( OPC_COLUMN_ADDRESS_LOW );
 		SendCommand( OPC_COLUMN_ADDRESS_HIGH );
-		SendCommand( OPC_SET_MULTIPLEX_RATIO, 0x3F );
-		SendCommand( OPC_DISPLAY_LINE_OFFSET, 0 );
-		SendCommand( OPC_DISPLAY_START_LINE );
-
-		if( CHIP_TYPE_SSD1306 == m_ChipType )
-		{
-			SendCommand( OPC_SET_COM_PINS, 0x22 );
-			SendCommand( OPC_SET_VCOM_DESELECT_LEVEL, 0x40 );
-			SendCommand( OPC_SET_CONTRAST, 0xCF );
-		}
-		else
-		{
-			SendCommand( OPC_DC_DC_CONTROL_MODE, DC_DC_ON );
-			SendCommand( OPC_DC_DC_PUMP_VOLTAGE_8_0 );
-			SendCommand( OPC_SET_COM_PINS, 0x12 );
-			SendCommand( OPC_SET_VCOM_DESELECT_LEVEL, 0x35 );
-			SendCommand( OPC_SET_CONTRAST, 0xFF );
-		}
-
-		SendCommand( OPC_MODE_NORMAL );
 		SendCommand( OPC_DISPLAY_ON );
 		SendCommand( OPC_SEG_ROTATION_RIGHT );
 		SendCommand( OPC_OUTPUT_SCAN_NORMAL );
@@ -476,8 +463,12 @@ void SimpleDisplayClass::SetCursor( uint8_t usTextLine, uint8_t usTextColumn )
 //
 void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 {
-	uint16_t		uiHelper;
+
+#ifdef ARDUINO_ARCH_AVR
 	const uint8_t *	pusActualColumn;
+#endif
+
+	uint16_t		uiHelper;
 	uint8_t			usLetterColumn;
 
 	if( m_bDisplayConnected )
@@ -502,10 +493,23 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 			//	into the font array to that position where the bitmap of
 			//	this character starts
 			//
+#ifdef PRINT_DEBUG_INFO
+			Serial.print( "PrintChar( " );
+			Serial.print( (char)usCharIdx );
+#endif
+
 			uiHelper   = usCharIdx - 32;
 			uiHelper <<= 3;	//	mit 8 multiplizieren
 
+#ifdef PRINT_DEBUG_INFO
+			Serial.print( " ): Idx: " );
+			Serial.print( uiHelper );
+			Serial.print( " => " );
+#endif
+
+#ifdef ARDUINO_ARCH_AVR
 			pusActualColumn = &font8x8_simple[ 0 ] + uiHelper;
+#endif
 
 			//--------------------------------------------------------------
 			//	transmit the bitmap of the character to the display
@@ -514,10 +518,22 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 
 			Wire.write( PREFIX_DATA );
 
-			for( uint8_t idx = 0 ; idx < PIXELS_CHAR_WIDTH ; idx++ )
+			for( uint8_t idx = 0 ; PIXELS_CHAR_WIDTH > idx ; idx++ )
 			{
+
+#ifdef ARDUINO_ARCH_AVR
 				usLetterColumn = pgm_read_byte( pusActualColumn );
 				pusActualColumn++;
+#else
+				usLetterColumn = (uint8_t)font8x8_simple[ uiHelper ];
+				uiHelper++;
+#endif
+
+#ifdef PRINT_DEBUG_INFO
+				Serial.print( " " );
+				Serial.print( usLetterColumn, HEX );
+				Serial.print( " " );
+#endif
 
 				if( m_bInverse )
 				{
@@ -529,6 +545,10 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 
 			Wire.endTransmission();
 
+#ifdef PRINT_DEBUG_INFO
+			Serial.println();
+#endif
+
 			//--------------------------------------------------------------
 			//	one character printed, so move cursor
 			//
@@ -537,6 +557,8 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 	}
 }
 
+
+#ifdef ARDUINO_ARCH_AVR
 
 //**************************************************************************
 //	Print
@@ -586,6 +608,8 @@ void SimpleDisplayClass::PrintLn( const __FlashStringHelper* cstrText )
 		NextLine( true );
 	}
 }
+
+#endif
 
 
 //**************************************************************************
@@ -844,6 +868,56 @@ void SimpleDisplayClass::SetDisplayColumnOffset( uint8_t usOffset )
 			m_usDisplayColumnOffset = usOffset;
 		}
 	}
+}
+
+
+//**************************************************************************
+//	Initsh1106 (private)
+//--------------------------------------------------------------------------
+//	This function will send the initialize sequence to a display with
+//	a ssd1306 chip type.
+//
+void SimpleDisplayClass::Initsh1106( void )
+{
+	SendCommand( OPC_DISPLAY_OFF );
+	SendCommand( OPC_ENTIRE_DISPLAY_NORMAL );
+	SendCommand( OPC_CLK_DIV_OSC_FREQ, (OSC_FREQ_VARIATION_P_M_0 | CLOCK_DIV_RATIO_1) );
+	SendCommand( OPC_SET_MULTIPLEX_RATIO, 0x3F );
+	SendCommand( OPC_DISPLAY_LINE_OFFSET, 0 );
+	SendCommand( OPC_DISPLAY_START_LINE );
+	SendCommand( OPC_DC_DC_CONTROL_MODE, DC_DC_ON );
+	SendCommand( OPC_DIS_PRE_CHARGE_PERIOD, (DIS_CHARGE_PERIOD_DCLK_2 | PRE_CHARGE_PERIOD_DCLK_2) );
+	SendCommand( OPC_SET_VCOM_DESELECT_LEVEL, 0x35 );
+	SendCommand( OPC_DC_DC_PUMP_VOLTAGE_8_0 );
+	SendCommand( OPC_SET_CONTRAST, 0xFF );
+	SendCommand( OPC_MODE_NORMAL );
+	SendCommand( OPC_SET_COM_PINS, 0x12 );
+}
+
+
+//**************************************************************************
+//	Initssd1306 (private)
+//--------------------------------------------------------------------------
+//	This function will send the initialize sequence to a display with
+//	a ssd1306 chip type.
+//
+void SimpleDisplayClass::Initssd1306( void )
+{
+	SendCommand( OPC_DISPLAY_OFF );
+	SendCommand( OPC_CLK_DIV_OSC_FREQ, (OSC_FREQ_VARIATION_P_15 | CLOCK_DIV_RATIO_1) );
+	SendCommand( OPC_SET_MULTIPLEX_RATIO, 0x3F );
+	SendCommand( OPC_DISPLAY_LINE_OFFSET, 0 );
+	SendCommand( OPC_DISPLAY_START_LINE );
+	SendCommand( OPC_CHARGE_PUMP_SETTING, 0x14 );
+	SendCommand( OPC_MEMORY_ADR_MODE, ADR_MODE_PAGE );
+	SendCommand( OPC_SET_COM_PINS, 0x12 );
+	SendCommand( OPC_SET_CONTRAST, 0xCF );
+//	SendCommand( OPC_DIS_PRE_CHARGE_PERIOD, (DIS_CHARGE_PERIOD_DCLK_2 | PRE_CHARGE_PERIOD_DCLK_2) );
+	SendCommand( OPC_DIS_PRE_CHARGE_PERIOD, (DIS_CHARGE_PERIOD_DCLK_15 | PRE_CHARGE_PERIOD_DCLK_1) );
+	SendCommand( OPC_SET_VCOM_DESELECT_LEVEL, 0x40 );
+//	SendCommand( OPC_DEACTIVATE_SCROLL );	//	I think this is not needed, because we are in Page mode
+	SendCommand( OPC_ENTIRE_DISPLAY_NORMAL );
+	SendCommand( OPC_MODE_NORMAL );
 }
 
 

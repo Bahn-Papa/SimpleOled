@@ -69,19 +69,21 @@
 //
 //==========================================================================
 
+#include <Arduino.h>
 #include <stdint.h>
 #include <SimpleOled.h>
 
 
 //==========================================================================
 //
-//		D E F I N I T I O N S
+//		G L O B A L   V A R I A B L E S
 //
 //==========================================================================
 
 char g_strPrintModes[]			= "PrintModes Demo";
 char g_strOverwriteNextLine[]	= " Overwrite Next Line ";
-char g_strOverwriteSameLine[]	= " Overwrite Same Line \n\n";
+char g_strOverwriteSameLine[]	= " Overwrite Same Line ";
+char g_strNewLineCharFound[]	= "\n New Line Character found ";
 char g_strScrollLine[]			= " Scroll Line (default mode) ";
 bool g_bInverseFont				= false;
 
@@ -93,7 +95,17 @@ bool g_bInverseFont				= false;
 //
 void setup()
 {
-	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
+	//------------------------------------------------------------------
+	//	default settings:
+	//		chip type:	ssd1306
+	//		I2C adr:	60 (0x3C)
+	//
+	g_clDisplay.Init();
+
+	//------------------------------------------------------------------
+	//	alternate settings
+	//
+//	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
 }
 
 
@@ -187,9 +199,30 @@ void loop()
 
 	g_clDisplay.SetPrintMode( PM_OVERWRITE_SAME_LINE );
 
+	//------------------------------------------------------------------
+	//	first overwrite only the same line
+	//
 	for( uint8_t count = 0 ; count < 5 ; count++ )
 	{
 		pchLetter		= g_strOverwriteSameLine;
+		g_bInverseFont	= !g_bInverseFont;
+
+		g_clDisplay.SetInverseFont( g_bInverseFont );
+
+		while( '\0' != *pchLetter )
+		{
+			g_clDisplay.PrintChar( *pchLetter++ );
+
+			delay( 100 );
+		}
+	}
+
+	//------------------------------------------------------------------
+	//	but with a New Line you can go into the next line
+	//
+	for( uint8_t count = 0 ; count < 5 ; count++ )
+	{
+		pchLetter		= g_strNewLineCharFound;
 		g_bInverseFont	= !g_bInverseFont;
 
 		g_clDisplay.SetInverseFont( g_bInverseFont );

@@ -32,14 +32,30 @@
 //
 //==========================================================================
 
+#include <Arduino.h>
 #include <stdint.h>
-#include <avr/pgmspace.h>
 #include <SimpleOled.h>
+
+#ifdef ARDUINO_ARCH_AVR
+	#include <avr/pgmspace.h>
+#endif
 
 
 //==========================================================================
 //
 //		D E F I N I T I O N S
+//
+//==========================================================================
+
+#ifndef ARDUINO_ARCH_AVR
+	#undef F
+	#define F( text )	(text)
+#endif
+
+
+//==========================================================================
+//
+//		G L O B A L   V A R I A B L E S
 //
 //==========================================================================
 
@@ -53,7 +69,17 @@ char g_buffer[ 20 ];
 //
 void setup()
 {
-	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
+	//------------------------------------------------------------------
+	//	default settings:
+	//		chip type:	ssd1306
+	//		I2C adr:	60 (0x3C)
+	//
+	g_clDisplay.Init();
+
+	//------------------------------------------------------------------
+	//	alternate settings
+	//
+//	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
 }
 
 
@@ -70,7 +96,7 @@ void loop()
 	//	print Info
 	//
 	g_clDisplay.SetCursor( 2, 0 );
-	g_clDisplay.Print( "Flash-Flip-Demo" );
+	g_clDisplay.Print( F( "Flash-Flip-Demo" ) );
 
 	delay( 2000 );
 
@@ -122,7 +148,7 @@ void loop()
 	g_clDisplay.PrintLn( F( "is turned by" ) );
 	g_clDisplay.PrintLn( F( "180 degree." ) );
 
-	delay( 2000 );
+	delay( 4000 );
 
 	g_clDisplay.Print( F( "\nand flip back" ) );
 

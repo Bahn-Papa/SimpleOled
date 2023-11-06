@@ -24,6 +24,17 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	5		Date: 06.11.2023
+//#
+//#	Implementation:
+//#		-	add ESP32 support
+//#		-	rework of the initialize sequence
+//#			new functions
+//#				Initsh1106()
+//#				Initssd1306()
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	4		Date: 31.10.2023
 //#
 //#	Implementation:
@@ -142,8 +153,10 @@ class SimpleDisplayClass
 
 		void PrintChar( uint8_t usCharIdx );
 
+#ifdef ARDUINO_ARCH_AVR
 		void Print(   const __FlashStringHelper* cstrText );
 		void PrintLn( const __FlashStringHelper* cstrText );
+#endif
 
 		void Print(   char* strText );
 		void PrintLn( char* strText );
@@ -200,6 +213,8 @@ class SimpleDisplayClass
 		uint8_t			m_usLineOffset;
 		bool			m_bInverse;
 
+		void Initsh1106( void );
+		void Initssd1306( void );
 		void NextLine( bool bShiftLine );
 		void SendCommand( uint8_t usOpCode );
 		void SendCommand( uint8_t usOpCode, uint8_t usParameter );

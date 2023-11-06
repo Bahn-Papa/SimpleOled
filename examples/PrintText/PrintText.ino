@@ -34,6 +34,7 @@
 //
 //==========================================================================
 
+#include <Arduino.h>
 #include <stdint.h>
 #include <SimpleOled.h>
 
@@ -41,6 +42,18 @@
 //==========================================================================
 //
 //		D E F I N I T I O N S
+//
+//==========================================================================
+
+#ifndef ARDUINO_ARCH_AVR
+	#undef F
+	#define F( text )	(text)
+#endif
+
+
+//==========================================================================
+//
+//		G L O B A L   V A R I A B L E S
 //
 //==========================================================================
 
@@ -54,7 +67,22 @@ char g_buffer[ 20 ];
 //
 void setup()
 {
-	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
+	Serial.begin( 115200 );
+
+	//------------------------------------------------------------------
+	//	default settings:
+	//		chip type:	ssd1306
+	//		I2C adr:	60 (0x3C)
+	//
+	g_clDisplay.Init();
+
+	//------------------------------------------------------------------
+	//	alternate settings
+	//
+//	g_clDisplay.Init( CHIP_TYPE_SH1106, DISPLAY_ADDRESS );
+
+	Serial.println( "SimpleOled Demo: PrintText" );
+	Serial.println( "setup chip type sh1106" );
 }
 
 
@@ -65,6 +93,8 @@ void setup()
 //
 void loop()
 {
+	Serial.println( "Print Text Demo" );
+
 	g_clDisplay.Print( F( "Print Text Demo" ) );
 
 	delay( 2000 );
@@ -73,6 +103,8 @@ void loop()
 	//	positioning the cursor to the beginning of the third line
 	//	print text in normal font mode
 	//
+	Serial.println( "Normal Text" );
+
 	g_clDisplay.SetCursor( 2, 0 );
 	g_clDisplay.PrintLn( F( "Normal Text\n" ) );
 
@@ -81,6 +113,8 @@ void loop()
 	//----------------------------------------------------------------------
 	//	now print some text in inverse font mode
 	//
+	Serial.println( "Inverse Font" );
+
 	g_clDisplay.SetInverseFont( true );
 	g_clDisplay.Print( F( "Inverse Font" ) );
 
@@ -89,6 +123,8 @@ void loop()
 	//----------------------------------------------------------------------
 	//	some additional text to demonstrate how to clear a line
 	//
+	Serial.println( "Clear this line" );
+
 	g_clDisplay.SetCursor( 6, 0 );
 	g_clDisplay.Print( F( "Clear this Line" ) );
 	g_clDisplay.SetInverseFont( false );
@@ -106,6 +142,8 @@ void loop()
 	//	and now clear the hole display
 	//	first some text ...
 	//
+	Serial.println( "Clear Display" );
+
 	g_clDisplay.Print( F( "Clear Display" ) );
 
 	delay( 2000 );
@@ -120,6 +158,8 @@ void loop()
 	//----------------------------------------------------------------------
 	//	another example for positioning the cursor and writing some text
 	//
+	Serial.println( "Print stars" );
+
 	g_clDisplay.SetInverseFont( true );
 	g_clDisplay.SetCursor( 0, 0 );
 	g_clDisplay.PrintChar( '*' );
@@ -137,6 +177,8 @@ void loop()
 	//	In this example you can see how to print text with numbers in it.
 	//	First prepare the text (in this case with function sprintf).
 	//	Then print the text.
+	Serial.println( "Print lines" );
+
 	for( uint8_t idx = 0 ; idx < g_clDisplay.MaxTextLines() ; idx++ )
 	{
 		g_clDisplay.SetCursor( idx, 4 );
@@ -156,6 +198,8 @@ void loop()
 	//----------------------------------------------------------------------
 	//	the last example for printing text.
 	//
+	Serial.println( "Print columns" );
+
 	g_clDisplay.SetCursor( 4, 0 );
 	g_clDisplay.Print( F( "Column" ) );
 	g_clDisplay.SetCursor( 3, 0 );
