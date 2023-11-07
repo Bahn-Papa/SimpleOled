@@ -21,6 +21,13 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	6		Date: 07.11.2023
+//#
+//#	Bug Fix:
+//#		-	did not start with chip type sh1106
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	5		Date: 06.11.2023
 //#
 //#	Implementation:
@@ -885,6 +892,7 @@ void SimpleDisplayClass::Initsh1106( void )
 	SendCommand( OPC_SET_MULTIPLEX_RATIO, 0x3F );
 	SendCommand( OPC_DISPLAY_LINE_OFFSET, 0 );
 	SendCommand( OPC_DISPLAY_START_LINE );
+	SendCommand( OPC_CHARGE_PUMP_SETTING, 0x14 );
 	SendCommand( OPC_DC_DC_CONTROL_MODE, DC_DC_ON );
 	SendCommand( OPC_DIS_PRE_CHARGE_PERIOD, (DIS_CHARGE_PERIOD_DCLK_2 | PRE_CHARGE_PERIOD_DCLK_2) );
 	SendCommand( OPC_SET_VCOM_DESELECT_LEVEL, 0x35 );
