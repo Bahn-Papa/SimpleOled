@@ -17,10 +17,21 @@
 //#
 //#		MIT License
 //#
-//#		Copyright (c) 2023	Michael Pfeil
+//#		Copyright (c) 2026	Michael Pfeil
 //#							Am Kuckhof 8
 //#							D - 52146 Würselen
 //#							GERMANY
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	6		Date: 02.10.2026
+//#
+//#	Implementation:
+//#		-	splitt 'SimpleDisplayClass' into two classes
+//#			 -	'DisplayBaseClass'
+//#			 -	'SimpleDisplayClass'
+//#			this is done in preparation for new display classes
+//#			other than 'SimpleDisplayClass'
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -76,6 +87,8 @@
 
 #include <stdint.h>
 
+#include "DisplayBase.h"
+
 
 //==========================================================================
 //
@@ -83,23 +96,12 @@
 //
 //==========================================================================
 
-#define	DISPLAY_ADDRESS					60
-#define SECOND_DISPLAY_ADDRESS			61
-
 
 //==========================================================================
 //
 //		T Y P E   D E F I N I T I O N S
 //
 //==========================================================================
-
-typedef enum chip_type
-{
-	CHIP_TYPE_SH1106	= 0,
-	CHIP_TYPE_SSD1306
-
-} chip_type_t;
-
 
 //----------------------------------------------------------------------
 //	The different print modes
@@ -141,12 +143,13 @@ typedef enum print_mode
 ////////////////////////////////////////////////////////////////////////////
 //	CLASS: SimpleDisplayClass
 //
-class SimpleDisplayClass
+class SimpleDisplayClass : public DisplayBaseClass
 {
 	public:
 		SimpleDisplayClass();
 
-		uint8_t Init( chip_type_t chipType = CHIP_TYPE_SSD1306, uint8_t address = DISPLAY_ADDRESS );
+		uint8_t Init(	chip_type_t	chipType	= CHIP_TYPE_SSD1306,
+						uint8_t		address		= DISPLAY_ADDRESS		);
 
 		uint8_t MaxTextLines( void );
 		uint8_t MaxTextColumns( void );
@@ -171,7 +174,6 @@ class SimpleDisplayClass
 			PrintLn( (char *)strText );
 		};
 
-
 		void Clear( void );
 		void ClearLine( uint8_t usLineToClear );
 		inline void ClearLine( void )
@@ -186,38 +188,25 @@ class SimpleDisplayClass
 			SetCursor( 0, 0 );
 		};
 
-		void SetInverse( bool bInverse );
-		void Flip( bool bFlip );
+		inline void SetPrintMode( print_mode_t printMode )
+		{
+			m_PrintMode = printMode;
+		};
 
 		inline void SetInverseFont( bool bInverse )
 		{
 			m_bInverse = bInverse;
 		};
 
-		inline void SetPrintMode( print_mode_t printMode )
-		{
-			m_PrintMode = printMode;
-		};
-
-		void SetDisplayColumnOffset( uint8_t usOffset );
-
 
 	private:
-		chip_type_t		m_ChipType;
-		bool			m_bDisplayConnected;
 		print_mode_t	m_PrintMode;
-		uint8_t			m_usAddress;
-		uint8_t			m_usDisplayColumnOffset;
 		uint8_t			m_usTextLine;
 		uint8_t			m_usTextColumn;
 		uint8_t			m_usLineOffset;
 		bool			m_bInverse;
 
-		void Initsh1106( void );
-		void Initssd1306( void );
 		void NextLine( bool bShiftLine );
-		void SendCommand( uint8_t usOpCode );
-		void SendCommand( uint8_t usOpCode, uint8_t usParameter );
 		void ShiftDisplayOneLine( void );
 };
 
