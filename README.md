@@ -1,21 +1,30 @@
 # SimpleOled
+SimpleOled is a small library that provides classes for text output on an OLED display (128 x 64 pixel) with sh1106/ssd1306 driver chip.
 
-SimpleOled is a small library just for text output on an OLED display (128 x 64 pixel) with sh1106/ssd1306 driver chip.
+#### Used Resources
+This is a library to use with the Arduino IDE.<br>
+The library itself makes use of the **_Wire_** library delivered with the Arduino IDE.
 
-If you want to print some data (e.g.: numbers) on the display than you have to build your output in a buffer first.<br>
-Then deliver the buffer as parameter to the Print functions.<br>
-(see example 'PrintText')
-
-### Why another OLED library ?
-
+## Why another OLED library ?
 I was searching for a simple OLED library to print out some infos (e.g.: debug infos).
 But all I found were libraries with much more capabilities that I don't want to have.
 Therefore these libraries need many resources (e.g.: flash and RAM memory).
 So I decide to write my own simple library.
 
-### Features:
+The library consits of several classes: a base class and classes derived from it with specific functionality.
 
-The library provides a global variable **_g_clDisplay_** of class **_SimpleOledDisplay_** to work with the OLED display.<br>
+### DisplayBaseClass
+This class provides the basic functions for communicating with the display via I2C.
+
+### SimpleDisplayClass
+With this class it is possible to write text on a display.<br>
+If you want to print some data (e.g.: numbers) on the display than you have to build your output in a buffer first.<br>
+Then deliver the buffer as parameter to the Print functions.<br>
+(see example 'PrintText')
+
+
+#### Features:
+The library provides a global variable **_g_clDisplay_** of class **_SimpleDisplayClass_** to work with the OLED display.<br>
 The class has the following function set:
 
 | Function | Description |
@@ -41,10 +50,7 @@ The class has the following function set:
 | | |
 | SetPrintMode( \<mode\> ) | There are three print modes:<br>PM_SCROLL_LINE: fill the lines of the display and scroll them out to the top<br>PM_OVERWRITE_NEXT_LINE: continuously overwrite the lines of the display from the beginning to the end<br>PM_OVERWRITE_SAME_LINE: overwrite the actual line |
 
-## How to use the library
-
-This is a library to use with the Arduino IDE.<br>
-The library itself makes use of the **_Wire_** library delivered with the Arduino IDE.
+### How to use the class **_SimpleDisplayClass_**
 
 Have a look into the examples and see how to use the functions.<br>
 All examples assume to control an OLED display with an sh1106 chip.<br>
