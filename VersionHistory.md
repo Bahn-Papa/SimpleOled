@@ -2,6 +2,7 @@
 
 | Version | Date | Description |
 | --- | --- | --- |
+| 2.01.00 | 06.10.2026 | Two new classes created to simple show numbers on a display.<br>- 'DisplayNumberColonClass' is the base class with all virtual functions to draw the numbers and the colon.<br>- 'Display7SegmentClass' implements the numbers as seven segment font.
 | 2.00.00 | 01.10.2026 | In preparation to new display classes the existing class was split into two new one:<br>- 'DisplayBaseClass' (common functions)<br> - 'SimpleDisplayClass' (specific functions for simple text output)<br>The streamlined 'SimpleDisplayClass' has the same functionality as before. Only the common functions were moved to the new base class 'DisplayBaseClass'.
 | 1.02.01 | 07.11.2023 | Bug Fix: did not start with chip type sh1106 |
 | 1.02.00 | 06.11.2023 | Add support for ESP32 and rework of function Init() |
