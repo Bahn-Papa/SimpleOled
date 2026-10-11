@@ -23,6 +23,15 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	2		from: 11.10.2026
+//#
+//#	Implementation:
+//#		-	consolidated version works with Arduino chips and Arduino IDE
+//#			as well as with ESP32 chips. The distinguishing feature is a
+//#			definition set by the Arduino IDE: ARDUINO_ARCH_AVR
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	1		from: 02.10.2026
 //#
 //#	Implementation:
@@ -40,12 +49,18 @@
 #include <stdint.h>
 
 
+#ifndef ARDUINO_ARCH_AVR
+	#include "driver/i2c_master.h"
+#endif
+
+
 //==========================================================================
 //
 //		D E F I N I T I O N S
 //
 //==========================================================================
 
+#define DISPLAY_ADDRESS_DEFAULT			255
 #define	DISPLAY_ADDRESS					60
 #define SECOND_DISPLAY_ADDRESS			61
 
@@ -79,10 +94,23 @@ class DisplayBaseClass
 {
 	public:
 		DisplayBaseClass();
-		DisplayBaseClass( chip_type_t chip_type );
+		DisplayBaseClass( chip_type_t chipType );
 
-		uint8_t Init( chip_type_t chipType, uint8_t address );
+#ifndef ARDUINO_ARCH_AVR
+		DisplayBaseClass( i2c_master_bus_handle_t bus );
+		DisplayBaseClass( i2c_master_bus_handle_t bus, chip_type_t chipType );
+#endif
+
 		uint8_t Init( uint8_t address );
+		uint8_t Init( chip_type_t chipType, uint8_t address );
+
+#ifndef ARDUINO_ARCH_AVR
+		uint8_t	Init(	i2c_master_bus_handle_t	bus,
+						chip_type_t				chipType,
+						uint8_t					address		);
+		uint8_t	Init(	i2c_master_bus_handle_t	bus,
+						uint8_t					address		);
+#endif
 
 		void SetDisplayColumnOffset( uint8_t usOffset );
 		void SetDisplayLineOffset( uint8_t usOffset );
@@ -98,10 +126,17 @@ class DisplayBaseClass
 
 
 	protected:
-		chip_type_t		m_ChipType;
-		bool			m_bDisplayConnected;
-		uint8_t			m_usAddress;
-		uint8_t			m_usDisplayColumnOffset;
+		chip_type_t				m_ChipType;
+		bool					m_bDisplayConnected;
+		uint8_t					m_usAddress;
+		uint8_t					m_usDisplayColumnOffset;
+
+#ifndef ARDUINO_ARCH_AVR
+		i2c_master_bus_handle_t	m_Bus;
+		i2c_master_dev_handle_t m_Display;
+
+		bool CheckConnection( void );
+#endif
 
 		void Initsh1106( void );
 		void Initssd1306( void );

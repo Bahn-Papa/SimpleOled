@@ -21,7 +21,16 @@
 //#
 //#-------------------------------------------------------------------------
 //#
-//#	File Version:	7		Date: 02.10.2026
+//#	File Version:	10		from: 11.10.2026
+//#
+//#	Implementation:
+//#		-	consolidated version works with Arduino chips and Arduino IDE
+//#			as well as with ESP32 chips. The distinguishing feature is a
+//#			definition set by the Arduino IDE: ARDUINO_ARCH_AVR
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	9		Date: 02.10.2026
 //#
 //#	Implementation:
 //#		-	splitt 'SimpleDisplayClass' into two classes
@@ -29,6 +38,26 @@
 //#			 -	'SimpleDisplayClass'
 //#			this is done in preparation for new display classes
 //#			other than 'SimpleDisplayClass'
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	8		Date: 18.09.2026
+//#
+//#	Implementation:
+//#		-	adaption to ESP-IDF version 6.1
+//#			change in function
+//#				Init()
+//#				CheckConnection()
+//#				SendCommand()
+//#			removed global variable
+//#				g_clDisplay
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	7		Date: 28.03.2024
+//#
+//#	Implementation:
+//#		-	first implementation with espressif framework 5.2.1
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -94,10 +123,14 @@
 //
 //==========================================================================
 
-#include <Arduino.h>
+#include <stdint.h>
 
 #ifdef ARDUINO_ARCH_AVR
+	#include <Arduino.h>
+
 	#include <avr/pgmspace.h>
+#else
+	#include "esp_err.h"
 #endif
 
 #include "SimpleOled.h"
@@ -112,7 +145,6 @@
 
 //#define	PRINT_DEBUG_INFO
 
-
 #define	TEXT_LINES						8
 #define TEXT_COLUMNS					16
 
@@ -126,9 +158,11 @@
 //
 //==========================================================================
 
-SimpleDisplayClass	g_clDisplay	= SimpleDisplayClass();
+#ifdef ARDUINO_ARCH_AVR
+	SimpleDisplayClass	g_clDisplay	= SimpleDisplayClass();
 
-uint8_t	g_arusDataBuffer[ PIXELS_CHAR_WIDTH ];
+	uint8_t	g_arusDataBuffer[ PIXELS_CHAR_WIDTH ];
+#endif
 
 
 ////////////////////////////////////////////////////////////////////////////
@@ -143,27 +177,8 @@ uint8_t	g_arusDataBuffer[ PIXELS_CHAR_WIDTH ];
 //	description
 //
 SimpleDisplayClass::SimpleDisplayClass()
+	: DisplayBaseClass()
 {
-	m_bDisplayConnected = false;
-}
-
-
-//**************************************************************************
-//	Init
-//--------------------------------------------------------------------------
-//	The Function initializes the class, sets the display in default
-//	operation mode, switches the display 'on', clears the display and
-//	sets the cursor to home position (top left corner).
-//
-uint8_t SimpleDisplayClass::Init( chip_type_t chipType, uint8_t address )
-{
-	m_PrintMode		= PM_SCROLL_LINE;
-	m_usTextLine	= 0;
-	m_usTextColumn	= 0;
-	m_usLineOffset	= 0;
-	m_bInverse		= false;
-
-	return( DisplayBaseClass::Init( chipType, address ) );
 }
 
 
@@ -235,6 +250,20 @@ void SimpleDisplayClass::SetCursor( uint8_t usTextLine, uint8_t usTextColumn )
 
 
 //**************************************************************************
+//	Flip
+//--------------------------------------------------------------------------
+//	This function will turn the output on the display by 180 degree
+//	and clears the display.
+//
+void SimpleDisplayClass::Flip( bool bFlip )
+{
+	DisplayBaseClass::Flip( bFlip );
+
+	Clear();
+}
+
+
+//**************************************************************************
 //	PrintChar
 //--------------------------------------------------------------------------
 //	This function will print the given character on the display starting at
@@ -247,13 +276,13 @@ void SimpleDisplayClass::SetCursor( uint8_t usTextLine, uint8_t usTextColumn )
 //
 void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 {
+	uint8_t			arusSendBuffer[ PIXELS_CHAR_WIDTH + 2 ];
+	uint16_t		uiHelper;
+	uint8_t			usLetterColumn;
 
 #ifdef ARDUINO_ARCH_AVR
 	const uint8_t *	pusActualColumn;
 #endif
-
-	uint16_t		uiHelper;
-	uint8_t			usLetterColumn;
 
 	if( m_bDisplayConnected )
 	{
@@ -296,9 +325,9 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 #endif
 
 			//--------------------------------------------------------------
-			//	transmit the bitmap of the character to the display
+			//	copy the bitmap of the character into the send buffer
 			//
-			for( uint8_t idx = 0 ; PIXELS_CHAR_WIDTH > idx ; idx++ )
+			for( uint8_t idx = 0 ; PIXELS_CHAR_WIDTH >= idx ; idx++ )
 			{
 
 #ifdef ARDUINO_ARCH_AVR
@@ -320,10 +349,13 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 					usLetterColumn = ~usLetterColumn;
 				}
 
-				g_arusDataBuffer[ idx ] = usLetterColumn;
+				arusSendBuffer[ idx ] = usLetterColumn;
 			}
 
-			Draw( g_arusDataBuffer, PIXELS_CHAR_WIDTH );
+			//--------------------------------------------------------------
+			//	transmit the bitmap of the character to the display
+			//
+			Draw( arusSendBuffer, PIXELS_CHAR_WIDTH );
 
 #ifdef PRINT_DEBUG_INFO
 			Serial.println();
@@ -565,7 +597,7 @@ void SimpleDisplayClass::NextLine( bool bShiftLine )
 
 
 //**************************************************************************
-//	ShiftDisplayOneLine (private)
+//	SetDisplayLineOffset (private)
 //--------------------------------------------------------------------------
 //	Die Funktion
 //

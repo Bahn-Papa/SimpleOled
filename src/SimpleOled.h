@@ -24,7 +24,16 @@
 //#
 //#-------------------------------------------------------------------------
 //#
-//#	File Version:	6		Date: 02.10.2026
+//#	File Version:	9		from: 11.10.2026
+//#
+//#	Implementation:
+//#		-	consolidated version works with Arduino chips and Arduino IDE
+//#			as well as with ESP32 chips. The distinguishing feature is a
+//#			definition set by the Arduino IDE: ARDUINO_ARCH_AVR
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	8		Date: 02.10.2026
 //#
 //#	Implementation:
 //#		-	splitt 'SimpleDisplayClass' into two classes
@@ -32,6 +41,24 @@
 //#			 -	'SimpleDisplayClass'
 //#			this is done in preparation for new display classes
 //#			other than 'SimpleDisplayClass'
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	7		Date: 18.09.2026
+//#
+//#	Implementation:
+//#		-	adaption to ESP-IDF version 6.1
+//#			change in function
+//#				Init()
+//#			removed global variable
+//#				g_clDisplay
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	6		Date: 28.03.2024
+//#
+//#	Implementation:
+//#		-	first implementation with espressif framework 5.2.1
 //#
 //#-------------------------------------------------------------------------
 //#
@@ -103,6 +130,7 @@
 //
 //==========================================================================
 
+
 //----------------------------------------------------------------------
 //	The different print modes
 //
@@ -148,9 +176,6 @@ class SimpleDisplayClass : public DisplayBaseClass
 	public:
 		SimpleDisplayClass();
 
-		uint8_t Init(	chip_type_t	chipType	= CHIP_TYPE_SSD1306,
-						uint8_t		address		= DISPLAY_ADDRESS		);
-
 		uint8_t MaxTextLines( void );
 		uint8_t MaxTextColumns( void );
 
@@ -174,6 +199,7 @@ class SimpleDisplayClass : public DisplayBaseClass
 			PrintLn( (char *)strText );
 		};
 
+
 		void Clear( void );
 		void ClearLine( uint8_t usLineToClear );
 		inline void ClearLine( void )
@@ -188,23 +214,25 @@ class SimpleDisplayClass : public DisplayBaseClass
 			SetCursor( 0, 0 );
 		};
 
-		inline void SetPrintMode( print_mode_t printMode )
-		{
-			m_PrintMode = printMode;
-		};
+		void Flip( bool bFlip );
 
 		inline void SetInverseFont( bool bInverse )
 		{
 			m_bInverse = bInverse;
 		};
 
+		inline void SetPrintMode( print_mode_t printMode )
+		{
+			m_PrintMode = printMode;
+		};
+
 
 	private:
-		print_mode_t	m_PrintMode;
-		uint8_t			m_usTextLine;
-		uint8_t			m_usTextColumn;
-		uint8_t			m_usLineOffset;
-		bool			m_bInverse;
+		print_mode_t			m_PrintMode;
+		uint8_t					m_usTextLine;
+		uint8_t					m_usTextColumn;
+		uint8_t					m_usLineOffset;
+		bool					m_bInverse;
 
 		void NextLine( bool bShiftLine );
 		void ShiftDisplayOneLine( void );
@@ -217,4 +245,3 @@ class SimpleDisplayClass : public DisplayBaseClass
 //
 //==========================================================================
 
-extern SimpleDisplayClass	g_clDisplay;

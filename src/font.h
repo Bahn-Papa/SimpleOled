@@ -17,6 +17,22 @@
 //#
 //#	Fetched from: http://dimensionalrift.homelinux.net/combuster/mos3/?p=viewsource&file=/modules/gfx/font8_8.asm
 //#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	2		from: 11.10.2026
+//#
+//#	Implementation:
+//#		-	consolidated version works with Arduino chips and Arduino IDE
+//#			as well as with ESP32 chips. The distinguishing feature is a
+//#			definition set by the Arduino IDE: ARDUINO_ARCH_AVR
+//#
+//#-------------------------------------------------------------------------
+//#
+//#	File Version:	1		Date: 19.09.2023
+//#
+//#	Implementation:
+//#		-	Creation of the font
+//#
 //##########################################################################
 
 //--------------------------------------------------------------------------
@@ -30,7 +46,16 @@
 //	May be that this is different than other fonts where each value will
 //	hold the dots for one row of a character.
 //
-const unsigned char font8x8_simple[768] PROGMEM =
+#ifdef ARDUINO_ARCH_AVR
+	
+	const unsigned char font8x8_simple[768] PROGMEM =
+
+#else
+
+	const unsigned char font8x8_simple[768] =
+
+#endif
+
 {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,		//	space
 	0x00, 0x00, 0x06, 0x5F, 0x5F, 0x06, 0x00, 0x00,		//	!

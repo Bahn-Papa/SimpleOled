@@ -20,6 +20,15 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	2		from: 11.10.2026
+//#
+//#	Implementation:
+//#		-	consolidated version works with Arduino chips and Arduino IDE
+//#			as well as with ESP32 chips. The distinguishing feature is a
+//#			definition set by the Arduino IDE: ARDUINO_ARCH_AVR
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	1		from: 02.10.2026
 //#
 //#	Implementation:
@@ -36,8 +45,13 @@
 
 #include <stdint.h>
 
-#include <Arduino.h>
-#include <Wire.h>
+#ifdef ARDUINO_ARCH_AVR
+	#include <Arduino.h>
+	#include <Wire.h>
+#else
+	#include "freertos/FreeRTOS.h"
+	#include "freertos/task.h"
+#endif
 
 #include "DisplayBase.h"
 
@@ -47,6 +61,12 @@
 //		D E F I N I T I O N S
 //
 //==========================================================================
+
+#ifndef ARDUINO_ARCH_AVR
+	//#define I2C_BUS_FREQUENZ_HZ			400000
+	#define I2C_BUS_FREQUENZ_HZ			100000
+	#define I2C_TIMEOUT_MS				50
+#endif
 
 #define DISPLAY_COLUMN_OFFSET_MAX		3
 #define DISPLAY_COLUMN_OFFSET_MIN		0
@@ -223,8 +243,15 @@ uint8_t	g_arusPositionCommandBuffer[] =
 //
 DisplayBaseClass::DisplayBaseClass()
 {
-	m_ChipType			= CHIP_TYPE_UNKNOWN;
-	m_bDisplayConnected = false;
+#ifndef ARDUINO_ARCH_AVR
+	m_Bus					= NULL;
+	m_Display				= NULL;
+#endif
+
+	m_ChipType				= CHIP_TYPE_UNKNOWN;
+	m_bDisplayConnected		= false;
+	m_usAddress				= 0;
+	m_usDisplayColumnOffset	= 0;
 }
 
 
@@ -235,9 +262,86 @@ DisplayBaseClass::DisplayBaseClass()
 //
 DisplayBaseClass::DisplayBaseClass( chip_type_t chipType )
 {
-	m_ChipType			= chipType;
-	m_bDisplayConnected = false;
+#ifndef ARDUINO_ARCH_AVR
+	m_Bus					= NULL;
+	m_Display				= NULL;
+#endif
+
+	m_ChipType				= chipType;
+	m_bDisplayConnected		= false;
+	m_usAddress				= 0;
+	m_usDisplayColumnOffset	= 0;
 }
+
+
+#ifndef ARDUINO_ARCH_AVR
+
+//**************************************************************************
+//	Constructor
+//--------------------------------------------------------------------------
+//	description
+//
+DisplayBaseClass::DisplayBaseClass( i2c_master_bus_handle_t bus )
+{
+	m_Bus					= bus;
+	m_Display				= NULL;
+	m_ChipType				= CHIP_TYPE_UNKNOWN;
+	m_bDisplayConnected		= false;
+	m_usAddress				= 0;
+	m_usDisplayColumnOffset	= 0;
+}
+
+
+//**************************************************************************
+//	Constructor
+//--------------------------------------------------------------------------
+//	description
+//
+DisplayBaseClass::DisplayBaseClass( i2c_master_bus_handle_t bus, chip_type_t chipType )
+{
+	m_Bus					= bus;
+	m_Display				= NULL;
+	m_ChipType				= chipType;
+	m_bDisplayConnected		= false;
+	m_usAddress				= 0;
+	m_usDisplayColumnOffset	= 0;
+}
+
+
+//**************************************************************************
+//	Init
+//--------------------------------------------------------------------------
+//	The Function initializes the class, sets the display in default
+//	operation mode, switches the display 'on', clears the display and
+//	sets the cursor to home position (top left corner).
+//
+uint8_t DisplayBaseClass::Init(	i2c_master_bus_handle_t	bus,
+								uint8_t					address )
+{
+	m_Bus = bus;
+
+	return( Init( address ) );
+}
+
+
+//**************************************************************************
+//	Init
+//--------------------------------------------------------------------------
+//	The Function initializes the class, sets the display in default
+//	operation mode, switches the display 'on', clears the display and
+//	sets the cursor to home position (top left corner).
+//
+uint8_t DisplayBaseClass::Init(	i2c_master_bus_handle_t	bus,
+								chip_type_t				chipType,
+								uint8_t					address )
+{
+	m_Bus		= bus;
+	m_ChipType	= chipType;
+
+	return( Init( address ) );
+}
+
+#endif
 
 
 //**************************************************************************
@@ -249,25 +353,59 @@ DisplayBaseClass::DisplayBaseClass( chip_type_t chipType )
 //
 uint8_t DisplayBaseClass::Init( chip_type_t chipType, uint8_t address )
 {
-	uint8_t	usError;
-
-
 	//------------------------------------------------------------------
 	//	set initial values for internal variables
 	//
 	m_ChipType	= chipType;
 
+	return( Init( address ) );
+}
+
+
+//**************************************************************************
+//	Init
+//--------------------------------------------------------------------------
+//	The Function initializes the class, sets the display in default
+//	operation mode, switches the display 'on', clears the display and
+//	sets the cursor to home position (top left corner).
+//
+uint8_t DisplayBaseClass::Init( uint8_t address )
+{
+	//------------------------------------------------------------------
+	//	set initial values for internal variables
+	//
+	m_usAddress	= address;
+
+	//------------------------------------------------------------------
+	//	check minimum parameter
+	//
+	if(		(CHIP_TYPE_SH1106  != m_ChipType)
+		&&	(CHIP_TYPE_SSD1306 != m_ChipType) )
+	{
+		return( 1 );
+	}
 
 	//------------------------------------------------------------------
 	//	Check the given address
 	//
-	if( !(DISPLAY_ADDRESS == address) || (SECOND_DISPLAY_ADDRESS == address) )
+	if(		(DISPLAY_ADDRESS		!= address)
+		&&	(SECOND_DISPLAY_ADDRESS != address) )
 	{
 		//----------------------------------------------------------
 		//	no valid address
 		//
-		return( 1 );
+		return( 2 );
 	}
+
+#ifndef ARDUINO_ARCH_AVR
+	if( NULL == m_Bus )
+	{
+		return( 3 );
+	}
+#endif
+
+
+#ifdef ARDUINO_ARCH_AVR
 
 	//------------------------------------------------------------------
 	//	Initialize the I2C
@@ -282,13 +420,19 @@ uint8_t DisplayBaseClass::Init( chip_type_t chipType, uint8_t address )
 
 	if( 0 == usError )
 	{
-		//----------------------------------------------------------
-		//	YES the display can be connected with the given address
-		//	so initialize the display
-		//
-		m_usAddress			= address;
-		m_bDisplayConnected	= true;
+		m_bDisplayConnected = true;
+	}
 
+#else
+
+	//------------------------------------------------------------------
+	//
+	m_bDisplayConnected = CheckConnection();
+
+#endif
+
+	if( m_bDisplayConnected )
+	{
 		if( CHIP_TYPE_SSD1306 == m_ChipType )
 		{
 			m_usDisplayColumnOffset	= 0;
@@ -312,25 +456,7 @@ uint8_t DisplayBaseClass::Init( chip_type_t chipType, uint8_t address )
 		ClearDisplay();
 	}
 	
-	return( usError );
-}
-
-
-//**************************************************************************
-//	Init
-//--------------------------------------------------------------------------
-//	The Function initializes the class, sets the display in default
-//	operation mode, switches the display 'on', clears the display and
-//	sets the cursor to home position (top left corner).
-//
-uint8_t DisplayBaseClass::Init( uint8_t address )
-{
-	if( CHIP_TYPE_UNKNOWN == m_ChipType )
-	{
-		m_ChipType = CHIP_TYPE_SSD1306;
-	}
-
-	return( Init( m_ChipType, address ) );
+	return( 0 );
 }
 
 
@@ -394,6 +520,8 @@ void DisplayBaseClass::ClearDisplay( void )
 		{
 			ClearPage( usPage );
 		}
+
+		SetDrawPosition( 0, 0 );
 	}
 }
 
@@ -407,6 +535,17 @@ void DisplayBaseClass::ClearPage( uint8_t usPage )
 {
 	uint8_t		usLoop1End;
 	uint8_t		usLoop2End;
+
+#ifndef ARDUINO_ARCH_AVR
+	uint8_t		arusData[ 24 ];
+
+	for( uint8_t idx = 0 ; 24 > idx ; idx++ )
+	{
+		arusData[ idx ] = 0x00;
+	}
+
+	arusData[ 0 ] = PREFIX_DATA;
+#endif
 
 	if( m_bDisplayConnected )
 	{
@@ -438,6 +577,9 @@ void DisplayBaseClass::ClearPage( uint8_t usPage )
 		//
 		for( uint8_t idx1 = 0 ; idx1 < usLoop1End ; idx1++ )
 		{
+
+#ifdef ARDUINO_ARCH_AVR
+
 			Wire.beginTransmission( m_usAddress );
 
 			Wire.write( PREFIX_DATA );
@@ -448,6 +590,13 @@ void DisplayBaseClass::ClearPage( uint8_t usPage )
 			}
 
 			Wire.endTransmission();
+
+#else
+
+			i2c_master_transmit( m_Display, arusData, usLoop2End + 1, 100 );
+
+#endif
+
 		}
 	}
 }
@@ -489,9 +638,22 @@ void DisplayBaseClass::SetDrawPosition( uint8_t usPage, uint8_t usColumn )
 		//------------------------------------------------------------------
 		//	now send the commands to position the cursor to the display
 		//
+
+#ifdef ARDUINO_ARCH_AVR
+
 		Wire.beginTransmission( m_usAddress );
 		Wire.write( g_arusPositionCommandBuffer, sizeof( g_arusPositionCommandBuffer ) );
 		Wire.endTransmission();
+
+#else
+
+		i2c_master_transmit(	m_Display,
+								g_arusPositionCommandBuffer,
+								sizeof( g_arusPositionCommandBuffer ),
+								100 );
+
+#endif
+
 	}
 }
 
@@ -503,6 +665,7 @@ void DisplayBaseClass::SetDrawPosition( uint8_t usPage, uint8_t usColumn )
 //
 void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 {
+	uint8_t	arusSendBuffer[ I2C_BUFFER_SIZE + 2 ];
 	uint8_t idx;
 
 	if( m_bDisplayConnected )
@@ -513,6 +676,8 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 		//
 		while( I2C_BUFFER_SIZE < usSize )
 		{
+
+#ifdef ARDUINO_ARCH_AVR
 			Wire.beginTransmission( m_usAddress );
 
 			Wire.write( PREFIX_DATA );
@@ -524,12 +689,27 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 
 			Wire.endTransmission();
 
+#else
+			arusSendBuffer[ 0 ] = PREFIX_DATA;
+
+			for( idx = 0 ; I2C_BUFFER_SIZE > idx ; idx++ )
+			{
+				arusSendBuffer[ 1 + idx ] = *pBuffer;
+				pBuffer++;
+			}
+
+			i2c_master_transmit(	m_Display, arusSendBuffer,
+									I2C_BUFFER_SIZE + 1, 100	);
+#endif
+
 			usSize -= I2C_BUFFER_SIZE;
 		}
 
 		//------------------------------------------------------
 		//	now transfer the rest of the data
 		//
+
+#ifdef ARDUINO_ARCH_AVR
 		Wire.beginTransmission( m_usAddress );
 
 		Wire.write( PREFIX_DATA );
@@ -540,6 +720,20 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 		}
 
 		Wire.endTransmission();
+
+#else
+		arusSendBuffer[ 0 ] = PREFIX_DATA;
+
+		for( idx = 0 ; usSize > idx ; idx++ )
+		{
+			arusSendBuffer[ 1 + idx ] = *pBuffer;
+			pBuffer++;
+		}
+
+		i2c_master_transmit( m_Display, arusSendBuffer, usSize + 1, 100 );
+
+#endif
+
 	}
 }
 
@@ -586,10 +780,78 @@ void DisplayBaseClass::Flip( bool bFlip )
 			SendCommand( OPC_SEG_ROTATION_RIGHT );
 			SendCommand( OPC_OUTPUT_SCAN_NORMAL );
 		}
-		
+
 		ClearDisplay();
 	}
 }
+
+
+#ifndef ARDUINO_ARCH_AVR
+
+//**************************************************************************
+//	CheckConnection (protected)
+//--------------------------------------------------------------------------
+//	This function will send the initialize sequence to a display with
+//	a ssd1306 chip type.
+//
+bool DisplayBaseClass::CheckConnection( void )
+{
+	i2c_device_config_t		dev_config;
+	esp_err_t				error;
+	bool					isConnected	= false;
+
+	//------------------------------------------------------------------
+	//	Check the given address
+	//
+	if( DISPLAY_ADDRESS_DEFAULT == m_usAddress )
+	{
+		//---------------------------------------------------------
+		//	no specific address set, so use the known addresses
+		//	to check if a display is connected
+		//
+		if( ESP_OK == i2c_master_probe( m_Bus, DISPLAY_ADDRESS, I2C_TIMEOUT_MS ) )
+		{
+			m_usAddress	= DISPLAY_ADDRESS;
+			isConnected	= true;
+		}
+		else if( ESP_OK == i2c_master_probe( m_Bus, SECOND_DISPLAY_ADDRESS, I2C_TIMEOUT_MS ) )
+		{
+			m_usAddress	= SECOND_DISPLAY_ADDRESS;
+			isConnected	= true;
+		}
+	}
+	else if( ESP_OK == i2c_master_probe( m_Bus, m_usAddress, I2C_TIMEOUT_MS ) )
+	{
+		isConnected = true;
+	}
+	else
+	{
+		m_usAddress = DISPLAY_ADDRESS_DEFAULT;
+	}
+
+	//------------------------------------------------------------------
+	//	if a display is connected then create an I2C device
+	//
+	if( isConnected )
+	{
+		dev_config.dev_addr_length	= I2C_ADDR_BIT_LEN_7;
+		dev_config.scl_speed_hz		= I2C_BUS_FREQUENZ_HZ;
+		dev_config.device_address	= m_usAddress;
+
+		error = i2c_master_bus_add_device( m_Bus, &dev_config, &m_Display );
+
+		ESP_ERROR_CHECK( error );
+
+		if( ESP_OK != error )
+		{
+			isConnected = false;
+		}
+	}
+
+	return( isConnected );
+}
+
+#endif
 
 
 //**************************************************************************
@@ -653,12 +915,24 @@ void DisplayBaseClass::Initssd1306( void )
 //
 void DisplayBaseClass::SendCommand( uint8_t usOpCode )
 {
+
+#ifdef ARDUINO_ARCH_AVR
+
 	Wire.beginTransmission( m_usAddress );
 
 	Wire.write( PREFIX_LAST_COMMAND );
 	Wire.write( usOpCode );
 
 	Wire.endTransmission();
+
+#else
+
+	uint8_t	arusSendBuffer[] = { PREFIX_LAST_COMMAND, usOpCode };
+
+	i2c_master_transmit( m_Display, arusSendBuffer, 2, 200 );
+
+#endif
+
 }
 
 
@@ -673,6 +947,9 @@ void DisplayBaseClass::SendCommand( uint8_t usOpCode )
 //
 void DisplayBaseClass::SendCommand( uint8_t usOpCode, uint8_t usParameter )
 {
+
+#ifdef ARDUINO_ARCH_AVR
+
 	Wire.beginTransmission( m_usAddress );
 
 	Wire.write( PREFIX_LAST_COMMAND );
@@ -680,4 +957,13 @@ void DisplayBaseClass::SendCommand( uint8_t usOpCode, uint8_t usParameter )
 	Wire.write( usParameter );
 
 	Wire.endTransmission();
+
+#else
+
+	uint8_t	arusSendBuffer[] = { PREFIX_LAST_COMMAND, usOpCode, usParameter, 0x00 };
+
+	i2c_master_transmit( m_Display, arusSendBuffer, 3, 200 );
+
+#endif
+
 }
