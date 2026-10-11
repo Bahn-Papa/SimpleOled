@@ -170,6 +170,8 @@ void setup()
 	Serial.println( "SimpleOled Demo: Print7Segment" );
 	Serial.println( "setup chip type ssd1306" );
 
+//	g_Display->Flip( true );
+
 	test();
 
 	g_Display->DrawDigit0( POS_HOUR_TENS );
@@ -219,9 +221,20 @@ void loop()
 
 		if( 60 == (g_usMinute + 1) )
 		{
-			printHour( g_usHour + 1 );
-		}
+			if( 24 == (g_usHour + 1) )
+			{
+				printHour( 0 );
+			}
+			else
+			{
+				printHour( g_usHour + 1 );
+			}
 
-		printMinute( g_usMinute + 1 );
+			printMinute( 0 );
+		}
+		else
+		{
+			printMinute( g_usMinute + 1 );
+		}
 	}
 }
