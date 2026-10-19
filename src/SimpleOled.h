@@ -24,6 +24,17 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	10		from: 19.10.2026
+//#
+//#	Implementation:
+//#		-	move the functionality to invert drawing (means black will get
+//#			white and vice versa) from the class 'SimpleOledClass' to
+//#			'DisplayBaseClass'.
+//#			For compatibility reasons, the function 'SetInverseFont()'
+//#			will remain.
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	9		from: 11.10.2026
 //#
 //#	Implementation:
@@ -182,6 +193,12 @@ class SimpleDisplayClass : public DisplayBaseClass
 		void PrintChar( uint8_t usCharIdx );
 
 #ifdef ARDUINO_ARCH_AVR
+		inline	uint8_t Init(	chip_type_t	chipType	= CHIP_TYPE_SSD1306,
+								uint8_t		address		= DISPLAY_ADDRESS		)
+		{
+			return( DisplayBaseClass::Init( chipType, address ) );
+		};
+
 		void Print(   const __FlashStringHelper* cstrText );
 		void PrintLn( const __FlashStringHelper* cstrText );
 #endif
@@ -218,7 +235,7 @@ class SimpleDisplayClass : public DisplayBaseClass
 
 		inline void SetInverseFont( bool bInverse )
 		{
-			m_bInverse = bInverse;
+			DisplayBaseClass::SetDrawInverse( bInverse );
 		};
 
 		inline void SetPrintMode( print_mode_t printMode )
@@ -232,7 +249,6 @@ class SimpleDisplayClass : public DisplayBaseClass
 		uint8_t					m_usTextLine;
 		uint8_t					m_usTextColumn;
 		uint8_t					m_usLineOffset;
-		bool					m_bInverse;
 
 		void NextLine( bool bShiftLine );
 		void ShiftDisplayOneLine( void );
@@ -245,3 +261,6 @@ class SimpleDisplayClass : public DisplayBaseClass
 //
 //==========================================================================
 
+#ifdef ARDUINO_ARCH_AVR
+	extern SimpleDisplayClass	g_clDisplay;
+#endif

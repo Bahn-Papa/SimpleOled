@@ -2,6 +2,9 @@
 
 | Version | Date | Description |
 | --- | --- | --- |
+| 2.02.01 | 19.10.2026 | Move functionality to draw inverted, means black on white instead of white on black, from class 'SimpleOledClass' to 'DisplayBaseClass'.<br>The interface of 'SimpleOledClass' did not change. |
+| 2.02.00 | 11.10.2026 | Consolidated version to work with Arduino IDE and ESP32 IDF |
+| 2.01.01 | 11.10.2026 | Bug Fix in example Print7Segment |
 | 2.01.00 | 06.10.2026 | Two new classes created to simple show numbers on a display.<br>- 'DisplayNumberColonClass' is the base class with all virtual functions to draw the numbers and the colon.<br>- 'Display7SegmentClass' implements the numbers as seven segment font.
 | 2.00.00 | 01.10.2026 | In preparation to new display classes the existing class was split into two new one:<br>- 'DisplayBaseClass' (common functions)<br> - 'SimpleDisplayClass' (specific functions for simple text output)<br>The streamlined 'SimpleDisplayClass' has the same functionality as before. Only the common functions were moved to the new base class 'DisplayBaseClass'.
 | 1.02.01 | 07.11.2023 | Bug Fix: did not start with chip type sh1106 |

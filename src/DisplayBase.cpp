@@ -20,6 +20,15 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	3		from: 19.10.2026
+//#
+//#	Implementation:
+//#		-	move the functionality to invert drawing (means black will get
+//#			white and vice versa) from the class 'SimpleOledClass' to
+//#			'DisplayBaseClass'.
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	2		from: 11.10.2026
 //#
 //#	Implementation:
@@ -250,6 +259,7 @@ DisplayBaseClass::DisplayBaseClass()
 
 	m_ChipType				= CHIP_TYPE_UNKNOWN;
 	m_bDisplayConnected		= false;
+	m_bDrawInverse			= false;
 	m_usAddress				= 0;
 	m_usDisplayColumnOffset	= 0;
 }
@@ -269,6 +279,7 @@ DisplayBaseClass::DisplayBaseClass( chip_type_t chipType )
 
 	m_ChipType				= chipType;
 	m_bDisplayConnected		= false;
+	m_bDrawInverse			= false;
 	m_usAddress				= 0;
 	m_usDisplayColumnOffset	= 0;
 }
@@ -287,6 +298,7 @@ DisplayBaseClass::DisplayBaseClass( i2c_master_bus_handle_t bus )
 	m_Display				= NULL;
 	m_ChipType				= CHIP_TYPE_UNKNOWN;
 	m_bDisplayConnected		= false;
+	m_bDrawInverse			= false;
 	m_usAddress				= 0;
 	m_usDisplayColumnOffset	= 0;
 }
@@ -303,6 +315,7 @@ DisplayBaseClass::DisplayBaseClass( i2c_master_bus_handle_t bus, chip_type_t chi
 	m_Display				= NULL;
 	m_ChipType				= chipType;
 	m_bDisplayConnected		= false;
+	m_bDrawInverse			= false;
 	m_usAddress				= 0;
 	m_usDisplayColumnOffset	= 0;
 }
@@ -406,6 +419,8 @@ uint8_t DisplayBaseClass::Init( uint8_t address )
 
 
 #ifdef ARDUINO_ARCH_AVR
+
+	uint8_t	usError;
 
 	//------------------------------------------------------------------
 	//	Initialize the I2C
@@ -665,11 +680,21 @@ void DisplayBaseClass::SetDrawPosition( uint8_t usPage, uint8_t usColumn )
 //
 void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 {
+#ifndef ARDUINO_ARCH_AVR
 	uint8_t	arusSendBuffer[ I2C_BUFFER_SIZE + 2 ];
+#endif
+
 	uint8_t idx;
 
 	if( m_bDisplayConnected )
 	{
+		//------------------------------------------------------
+		//	if we should draw inverted then we need
+		//	to invert all bits
+		//	draw inverted means:
+		//		- black pixels will get white
+		//		- white pixels will get black
+		//
 		//------------------------------------------------------
 		//	if the amount of data is bigger than the buffer,
 		//	then transfer slices of data that fit into the buffer
@@ -684,7 +709,14 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 
 			for( idx = 0 ; I2C_BUFFER_SIZE > idx ; idx++ )
 			{
-				Wire.write( pBuffer[ idx ] );
+				if( m_bDrawInverse )
+				{
+					Wire.write( ~pBuffer[ idx ] );
+				}
+				else
+				{
+					Wire.write( pBuffer[ idx ] );
+				}
 			}
 
 			Wire.endTransmission();
@@ -694,7 +726,15 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 
 			for( idx = 0 ; I2C_BUFFER_SIZE > idx ; idx++ )
 			{
-				arusSendBuffer[ 1 + idx ] = *pBuffer;
+				if( m_bDrawInverse )
+				{
+					arusSendBuffer[ 1 + idx ] = ~(*pBuffer);
+				}
+				else
+				{
+					arusSendBuffer[ 1 + idx ] = *pBuffer;
+				}
+
 				pBuffer++;
 			}
 
@@ -716,7 +756,14 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 
 		for( idx = 0 ; usSize > idx ; idx++ )
 		{
-			Wire.write( pBuffer[ idx ] );
+			if( m_bDrawInverse )
+			{
+				Wire.write( ~pBuffer[ idx ] );
+			}
+			else
+			{
+				Wire.write( pBuffer[ idx ] );
+			}
 		}
 
 		Wire.endTransmission();
@@ -726,7 +773,15 @@ void DisplayBaseClass::Draw( uint8_t *pBuffer, uint8_t usSize )
 
 		for( idx = 0 ; usSize > idx ; idx++ )
 		{
-			arusSendBuffer[ 1 + idx ] = *pBuffer;
+			if( m_bDrawInverse )
+			{
+				arusSendBuffer[ 1 + idx ] = ~(*pBuffer);
+			}
+			else
+			{
+				arusSendBuffer[ 1 + idx ] = *pBuffer;
+			}
+
 			pBuffer++;
 		}
 

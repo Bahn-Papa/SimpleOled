@@ -23,6 +23,15 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	3		from: 19.10.2026
+//#
+//#	Implementation:
+//#		-	move the functionality to invert drawing (means black will get
+//#			white and vice versa) from the class 'SimpleOledClass' to
+//#			'DisplayBaseClass'.
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	2		from: 11.10.2026
 //#
 //#	Implementation:
@@ -124,10 +133,21 @@ class DisplayBaseClass
 		void SetInverse( bool bInverse );
 		void Flip( bool bFlip );
 
+		inline void SetDrawInverse( bool bInverse )
+		{
+			m_bDrawInverse = bInverse;
+		};
+
+		inline chip_type_t GetChipType( void )
+		{
+			return( m_ChipType );
+		};
+
 
 	protected:
 		chip_type_t				m_ChipType;
 		bool					m_bDisplayConnected;
+		bool					m_bDrawInverse;
 		uint8_t					m_usAddress;
 		uint8_t					m_usDisplayColumnOffset;
 

@@ -21,6 +21,15 @@
 //#
 //#-------------------------------------------------------------------------
 //#
+//#	File Version:	11		from: 19.10.2026
+//#
+//#	Implementation:
+//#		-	move the functionality to invert drawing (means black will get
+//#			white and vice versa) from the class 'SimpleOledClass' to
+//#			'DisplayBaseClass'.
+//#
+//#-------------------------------------------------------------------------
+//#
 //#	File Version:	10		from: 11.10.2026
 //#
 //#	Implementation:
@@ -255,6 +264,10 @@ void SimpleDisplayClass::SetCursor( uint8_t usTextLine, uint8_t usTextColumn )
 //	This function will turn the output on the display by 180 degree
 //	and clears the display.
 //
+//	!!	ATTENTION  !!
+//	The function in the base class will not set the cursor to the home
+//	position. That is the reason why the function exists.
+//
 void SimpleDisplayClass::Flip( bool bFlip )
 {
 	DisplayBaseClass::Flip( bFlip );
@@ -343,11 +356,6 @@ void SimpleDisplayClass::PrintChar( uint8_t usCharIdx )
 				Serial.print( usLetterColumn, HEX );
 				Serial.print( " " );
 #endif
-
-				if( m_bInverse )
-				{
-					usLetterColumn = ~usLetterColumn;
-				}
 
 				arusSendBuffer[ idx ] = usLetterColumn;
 			}
